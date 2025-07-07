@@ -1,41 +1,90 @@
-# Prerequisites
-*.d
+# Build directories
+build/
+build-*/
+*-build-*/
+
+# Qt specific
+*.pro.user*
+*.qmlc
+*.jsc
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+.qmake.cache
+.qmake.stash
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+!*.cmake.in
+
+# IDE files
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.sublime-*
+.vs/
 
 # Compiled Object files
-*.slo
-*.lo
 *.o
 *.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
+*.ko
+*.elf
 
 # Executables
 *.exe
 *.out
 *.app
+ManualRegistrationGL_V2
 
-# debug information files
-*.dwo
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*~
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# Log files
+*.log
+
+# Dependencies
+vcpkg_installed/
+third_party/installed/
+node_modules/
+
+# Qt Quick Compiler generated files
+*.qmlc
+*.jsc
+
+# Test results
+test_results/
+coverage/

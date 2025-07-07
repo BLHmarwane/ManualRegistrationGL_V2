@@ -19,19 +19,31 @@ find_package(OpenCV REQUIRED)
 # Qt6 automatic MOC, UIC, and RCC
 qt6_standard_project_setup()
 
-# Include directories
-include_directories(${CMAKE_SOURCE_DIR}/include)
-include_directories(${OpenCV_INCLUDE_DIRS})
-
-# Main application source
-set(SOURCES
+# Create the main executable first
+qt6_add_executable(ManualRegistrationGL_V2
     src/main.cpp
 )
 
-# Create the main executable
-qt6_add_executable(ManualRegistrationGL_V2 ${SOURCES})
+# Add QML resources to the executable
+qt6_add_resources(ManualRegistrationGL_V2 "qml"
+    PREFIX "/"
+    FILES
+        src/qml/main.qml
+        src/qml/MainWindow.qml
+        src/qml/components/Viewport3D.qml
+        src/qml/components/ModeSelector.qml
+        src/qml/components/ShapeSelector.qml
+        src/qml/components/SessionControls.qml
+        src/qml/components/TransformDisplay.qml
+)
 
-# Link libraries for main application
+# Include directories
+target_include_directories(ManualRegistrationGL_V2 PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+    ${OpenCV_INCLUDE_DIRS}
+)
+
+# Link libraries
 target_link_libraries(ManualRegistrationGL_V2 PRIVATE
     Qt6::Core
     Qt6::Gui
@@ -40,9 +52,6 @@ target_link_libraries(ManualRegistrationGL_V2 PRIVATE
     Qt6::OpenGL
     ${OpenCV_LIBS}
 )
-
-# Include OpenCV headers
-target_include_directories(ManualRegistrationGL_V2 PRIVATE ${OpenCV_INCLUDE_DIRS})
 
 # Set output directory
 set_target_properties(ManualRegistrationGL_V2 PROPERTIES

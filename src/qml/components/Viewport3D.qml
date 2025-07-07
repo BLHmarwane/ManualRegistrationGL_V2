@@ -2,8 +2,10 @@ import QtQuick 2.15
 
 Rectangle {
     id: viewport
-    color: "#1a1a1a"
+    color: "#F5F5F5"  // Much lighter background!
     radius: 8
+    border.color: "#E0E0E0"
+    border.width: 1
 
     // Placeholder for 3D content
     Rectangle {
@@ -12,7 +14,7 @@ Rectangle {
         height: 300
         color: "transparent"
         border.color: "#4A90E2"
-        border.width: 2
+        border.width: 3
         radius: 150
 
         // Animated rotating element to show it's "3D"
@@ -22,7 +24,7 @@ Rectangle {
             width: 120
             height: 120
             color: "#4A90E2"
-            opacity: 0.7
+            opacity: 0.8
             radius: 8
 
             RotationAnimation {
@@ -43,7 +45,7 @@ Rectangle {
             anchors.margins: 10
             text: "3D Viewport"
             color: "#4A90E2"
-            font.pixelSize: 14
+            font.pixelSize: 16
             font.bold: true
         }
     }

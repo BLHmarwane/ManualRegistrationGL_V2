@@ -5,37 +5,37 @@ Rectangle {
     color: "#FFFFFF"
     border.color: "#E8F4FF"
     border.width: 1
-    radius: 8
+    radius: 6
     
     property bool sessionActive: false
     
     Column {
         anchors.fill: parent
-        anchors.margins: 24
-        spacing: 16
+        anchors.margins: 12
+        spacing: 8
         
         Text {
-            text: "Session Control"
+            text: "⚡ Session Control"
             color: "#333333"
-            font.pixelSize: 18
+            font.pixelSize: 12
             font.bold: true
         }
         
         Column {
             width: parent.width
-            spacing: 12
+            spacing: 6
             
             // Start Session Button
             Rectangle {
                 width: parent.width
-                height: 48
+                height: 35
                 color: !sessionControls.sessionActive ? "#4CAF50" : "#CCCCCC"
-                radius: 8
+                radius: 6
                 
                 Text {
                     anchors.centerIn: parent
-                    text: "Start Session"
-                    font.pixelSize: 14
+                    text: "▶️ Start Session"
+                    font.pixelSize: 11
                     font.bold: true
                     color: "#FFFFFF"
                 }
@@ -53,14 +53,14 @@ Rectangle {
             // Reset Transform Button
             Rectangle {
                 width: parent.width
-                height: 48
-                color: sessionControls.sessionActive ? "#4A90E2" : "#CCCCCC"
-                radius: 8
+                height: 35
+                color: sessionControls.sessionActive ? "#FF9800" : "#CCCCCC"
+                radius: 6
                 
                 Text {
                     anchors.centerIn: parent
-                    text: "Reset Transform"
-                    font.pixelSize: 14
+                    text: "🔄 Reset Transform"
+                    font.pixelSize: 11
                     color: "#FFFFFF"
                 }
                 
@@ -74,14 +74,14 @@ Rectangle {
             // Finish Session Button
             Rectangle {
                 width: parent.width
-                height: 48
+                height: 35
                 color: sessionControls.sessionActive ? "#F44336" : "#CCCCCC"
-                radius: 8
+                radius: 6
                 
                 Text {
                     anchors.centerIn: parent
-                    text: "Finish Session"
-                    font.pixelSize: 14
+                    text: "⏹️ Finish Session"
+                    font.pixelSize: 11
                     font.bold: true
                     color: "#FFFFFF"
                 }
@@ -100,14 +100,14 @@ Rectangle {
         // Session Status
         Rectangle {
             width: parent.width
-            height: 30
+            height: 25
             color: "#E8F4FF"
-            radius: 8
+            radius: 4
             
             Text {
                 anchors.centerIn: parent
-                text: sessionControls.sessionActive ? "Session Active" : "Ready to Start"
-                font.pixelSize: 12
+                text: sessionControls.sessionActive ? "🟢 Active" : "⚪ Ready"
+                font.pixelSize: 10
                 color: "#333333"
                 font.bold: true
             }

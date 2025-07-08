@@ -174,7 +174,8 @@ export MESA_GLSL_VERSION_OVERRIDE=330
 - OpenCV 4.6.0
 - GCC 11.4.0
 - NVIDIA RTX 4070 with driver 550.163.01
-
+```bash
+./scripts/install_dependencies.sh
 ### Ubuntu 22.04 LTS
 
 - Qt6 6.2.4

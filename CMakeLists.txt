@@ -4,7 +4,7 @@ project(ManualRegistrationGL_V2 VERSION 2.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find required Qt6 components (removed Controls)
+# Find required Qt6 components
 find_package(Qt6 REQUIRED COMPONENTS
     Core
     Gui
@@ -20,7 +20,7 @@ find_package(OpenCV REQUIRED)
 qt6_standard_project_setup()
 
 # Include directories
-include_directories(${CMAKE_SOURCE_DIR}/include)
+include_directories(${CMAKE_SOURCE_DIR}/src)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 # Add QML resources
@@ -29,10 +29,15 @@ qt6_add_resources(qml_resources src/qml/qml.qrc)
 # Main application source
 set(SOURCES
     src/main.cpp
+    src/OpenGL3DViewport.cpp
+)
+
+set(HEADERS
+    src/OpenGL3DViewport.hpp
 )
 
 # Create the main executable
-qt6_add_executable(ManualRegistrationGL_V2 ${SOURCES})
+qt6_add_executable(ManualRegistrationGL_V2 ${SOURCES} ${HEADERS})
 
 # Add QML resources to the executable
 target_sources(ManualRegistrationGL_V2 PRIVATE ${qml_resources})

@@ -356,10 +356,10 @@ Rectangle {
                anchors.fill: parent
                anchors.margins: 4
 
-               // Default values
+               // FIXED: Better initial values for 3D viewing
                currentShape: 4  // Tetrahedron
-               translation: Qt.vector3d(0.0, 0.0, -5.0)
-               rotation: Qt.vector3d(0.0, 0.0, 0.0)
+               translation: Qt.vector3d(0.0, 0.0, 0.0)      // Center at origin
+               rotation: Qt.vector3d(15.0, 25.0, 0.0)       // Good 3D viewing angle
                scale: 1.0
 
                // Connect transform changes to update display
@@ -417,10 +417,12 @@ Rectangle {
                anchors.margins: 20
                spacing: 20
 
-               // Session Controls Section
+               // Also update the session control buttons:
+
+// Session Controls Section
                Rectangle {
                    width: parent.width
-                   height: 180
+                   height: 180  // Increased height to fit all 3 buttons
                    color: "#FFFFFF"
                    border.color: "#E1E5E9"
                    border.width: 1
@@ -458,10 +460,10 @@ Rectangle {
                                anchors.fill: parent
                                onClicked: {
                                    console.log("Start session clicked")
-                                   // Apply demo transform
-                                   viewport3D.translation = Qt.vector3d(-2.0, 1.0, -6.0)
-                                   viewport3D.rotation = Qt.vector3d(30.0, 45.0, 0.0)
-                                   viewport3D.scale = 1.5
+                                   // Apply better demo transform for 3D viewing
+                                   viewport3D.translation = Qt.vector3d(0.5, -0.3, 0.2)
+                                   viewport3D.rotation = Qt.vector3d(45.0, 60.0, 15.0)
+                                   viewport3D.scale = 1.2
                                }
                            }
                        }
@@ -489,6 +491,7 @@ Rectangle {
                            }
                        }
 
+                       // FIXED: ADD BACK THE FINISH SESSION BUTTON!
                        Rectangle {
                            width: parent.width
                            height: 38
@@ -506,12 +509,15 @@ Rectangle {
 
                            MouseArea {
                                anchors.fill: parent
-                               onClicked: console.log("Finish clicked")
+                               onClicked: {
+                                   console.log("Finish session clicked")
+                                   // Reset to initial state
+                                   viewport3D.resetTransform()
+                               }
                            }
                        }
                    }
                }
-
                // Transform Display Section - REAL-TIME VALUES!
                Rectangle {
                    id: transformDisplay

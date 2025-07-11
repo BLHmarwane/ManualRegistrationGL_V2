@@ -6,7 +6,7 @@
 #include <QRandomGenerator>
 #include <QtMath>
 
-// Enhanced vertex shader with lighting and alpha support
+// Enhanced vertex shader with lighting support
 static const char* vertexShaderSource =
     "#version 330 core\n"
     "layout (location = 0) in vec3 aPos;\n"
@@ -153,7 +153,7 @@ void OpenGL3DRenderer::synchronize(QQuickFramebufferObject* item) {
 
         m_scale = viewport->scale();
 
-        // NEW: Sync research display settings
+        // Sync research display settings
         m_showReferenceModel = viewport->showReferenceModel();
         m_showMovableModel = viewport->showMovableModel();
         m_showVertexLabels = viewport->showVertexLabels();
@@ -172,7 +172,7 @@ void OpenGL3DRenderer::initializeGL() {
     }
 
     generateGeometry();
-    generateSphereMarkerGeometry();  // NEW: Generate sphere markers
+    generateSphereMarkerGeometry();
 
     qDebug() << "Research OpenGL 3D Renderer initialized successfully";
 }
@@ -209,7 +209,6 @@ void OpenGL3DRenderer::renderReferenceModel() {
     // REFERENCE MODEL: Fixed at origin with good viewing angle
     QMatrix4x4 referenceMatrix;
     referenceMatrix.setToIdentity();
-    // Apply a fixed rotation for good 3D visualization
     referenceMatrix.rotate(QQuaternion::fromEulerAngles(15.0f, 25.0f, 0.0f));
 
     QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * referenceMatrix;
@@ -222,12 +221,12 @@ void OpenGL3DRenderer::renderReferenceModel() {
     m_program->setUniformValue("lightPos", QVector3D(5.0f, 5.0f, 5.0f));
     m_program->setUniformValue("viewPos", QVector3D(4.0f, 3.0f, 6.0f));
 
-    // REFERENCE MODEL COLOR: Semi-transparent gray with good visibility
-    QVector3D referenceColor(0.7f, 0.7f, 0.8f);  // Light blue-gray
+    // REFERENCE MODEL COLOR: Semi-transparent gray
+    QVector3D referenceColor(0.7f, 0.7f, 0.8f);
     m_program->setUniformValue("color", referenceColor);
     m_program->setUniformValue("alpha", 0.4f);
 
-    // Bind and render with transparency
+    // Render
     m_vertexBuffer->bind();
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
@@ -259,10 +258,12 @@ void OpenGL3DRenderer::renderMovableModel() {
 
     m_program->bind();
 
-    // MOVABLE MODEL: Apply user transformations
+    // MOVABLE MODEL: Apply user transformations with visibility offset
     QMatrix4x4 movableMatrix;
-    movableMatrix.setToIdentity();
-    movableMatrix.translate(m_translation);
+
+    // Apply visibility offset FIRST to ensure it's always in front
+    QVector3D visibilityOffset(0.0f, 0.3f, 0.3f);
+    movableMatrix.translate(m_translation + visibilityOffset);
     movableMatrix.rotate(m_rotation);
     movableMatrix.scale(m_scale);
 
@@ -311,15 +312,15 @@ void OpenGL3DRenderer::renderMovableModel() {
     m_indexBuffer->bind();
 
     // First pass: Semi-transparent fill
-    m_program->setUniformValue("alpha", 0.3f);
+    m_program->setUniformValue("alpha", 0.4f);
     glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, 0);
 
     // Second pass: Solid wireframe edges
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    glLineWidth(3.0f);  // Thick edges for visibility
+    glLineWidth(4.0f);  // Thicker edges for better visibility
     m_program->setUniformValue("alpha", 1.0f);
     glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, 0);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);  // Restore fill mode
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     // Cleanup
     glDisableVertexAttribArray(0);
@@ -333,9 +334,9 @@ void OpenGL3DRenderer::renderMovableModel() {
 }
 
 void OpenGL3DRenderer::generateSphereMarkerGeometry() {
-    const int stacks = 8;  // Lower resolution for markers
+    const int stacks = 8;
     const int slices = 12;
-    const float radius = 1.0f;  // Will be scaled when rendering
+    const float radius = 1.0f;
 
     m_sphereVertices.clear();
     m_sphereNormals.clear();
@@ -352,7 +353,6 @@ void OpenGL3DRenderer::generateSphereMarkerGeometry() {
             float cosTheta = cos(theta);
             float sinTheta = sin(theta);
 
-            // Calculate vertex position
             float x = radius * sinPhi * cosTheta;
             float y = radius * cosPhi;
             float z = radius * sinPhi * sinTheta;
@@ -361,7 +361,6 @@ void OpenGL3DRenderer::generateSphereMarkerGeometry() {
             m_sphereVertices.append(y);
             m_sphereVertices.append(z);
 
-            // Normal is same as position for unit sphere
             m_sphereNormals.append(x);
             m_sphereNormals.append(y);
             m_sphereNormals.append(z);
@@ -421,16 +420,13 @@ void OpenGL3DRenderer::renderVertexMarker(const QVector3D& position, const QVect
 
     m_program->bind();
 
-    // Create marker transformation matrix
     QMatrix4x4 markerMatrix;
     markerMatrix.translate(position);
     markerMatrix.scale(scale);
 
-    // Calculate matrices
     QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * markerMatrix;
     QMatrix3x3 normalMatrix = markerMatrix.normalMatrix();
 
-    // Set uniforms
     m_program->setUniformValue("mvpMatrix", mvpMatrix);
     m_program->setUniformValue("modelMatrix", markerMatrix);
     m_program->setUniformValue("normalMatrix", normalMatrix);
@@ -439,7 +435,6 @@ void OpenGL3DRenderer::renderVertexMarker(const QVector3D& position, const QVect
     m_program->setUniformValue("color", color);
     m_program->setUniformValue("alpha", 1.0f);
 
-    // Bind sphere geometry
     m_sphereVertexBuffer->bind();
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
@@ -448,11 +443,9 @@ void OpenGL3DRenderer::renderVertexMarker(const QVector3D& position, const QVect
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
 
-    // Render marker
     m_sphereIndexBuffer->bind();
     glDrawElements(GL_TRIANGLES, m_sphereIndices.size(), GL_UNSIGNED_INT, 0);
 
-    // Cleanup
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
     m_sphereIndexBuffer->release();
@@ -465,18 +458,16 @@ void OpenGL3DRenderer::renderVertexLabels() {
     if (!m_showVertexLabels)
         return;
 
-    // Get vertices for current shape
     QVector<QVector3D> baseVertices;
 
     switch (m_currentShape) {
-        case 1:  // Cube - 8 corners
+        case 1:  // Cube
             baseVertices = {QVector3D(-1.0f, -1.0f, -1.0f), QVector3D(1.0f, -1.0f, -1.0f),
                             QVector3D(1.0f, 1.0f, -1.0f),   QVector3D(-1.0f, 1.0f, -1.0f),
                             QVector3D(-1.0f, -1.0f, 1.0f),  QVector3D(1.0f, -1.0f, 1.0f),
                             QVector3D(1.0f, 1.0f, 1.0f),    QVector3D(-1.0f, 1.0f, 1.0f)};
             break;
-
-        case 4:  // Tetrahedron - 4 corners
+        case 4:  // Tetrahedron
         default:
             baseVertices = {
                 QVector3D(0.0f, 1.2f, 0.0f),    // apex
@@ -487,47 +478,50 @@ void OpenGL3DRenderer::renderVertexLabels() {
             break;
     }
 
-    // Render reference model vertex markers (white with prime numbers)
+    // Render reference model vertex markers (large bright white)
     if (m_showReferenceModel) {
         QMatrix4x4 referenceMatrix;
         referenceMatrix.rotate(QQuaternion::fromEulerAngles(15.0f, 25.0f, 0.0f));
 
         for (int i = 0; i < baseVertices.size(); ++i) {
             QVector3D refPos = (referenceMatrix * QVector4D(baseVertices[i], 1.0f)).toVector3D();
-            QVector3D whiteColor(1.0f, 1.0f, 1.0f);         // White for reference (1', 2', 3', 4')
-            renderVertexMarker(refPos, whiteColor, 0.08f);  // Slightly larger
+            QVector3D brightWhite(1.0f, 1.0f, 1.0f);
+            renderVertexMarker(refPos, brightWhite, 0.15f);  // Large for reference (1', 2', 3', 4')
         }
     }
 
-    // Render movable model vertex markers (colored by shape)
+    // Render movable model vertex markers (bright colors)
     if (m_showMovableModel) {
         QMatrix4x4 movableMatrix;
-        movableMatrix.translate(m_translation);
+
+        // Apply same visibility offset as the model
+        QVector3D visibilityOffset(0.0f, 0.3f, 0.3f);
+        movableMatrix.translate(m_translation + visibilityOffset);
         movableMatrix.rotate(m_rotation);
         movableMatrix.scale(m_scale);
 
         QVector3D markerColor;
         switch (m_currentShape) {
             case 1:
-                markerColor = QVector3D(1.0f, 0.0f, 0.0f);
-                break;  // Red for cube
+                markerColor = QVector3D(1.0f, 0.2f, 0.2f);
+                break;  // Bright red
             case 2:
-                markerColor = QVector3D(0.0f, 0.0f, 1.0f);
-                break;  // Blue for sphere
+                markerColor = QVector3D(0.2f, 0.4f, 1.0f);
+                break;  // Bright blue
             case 3:
-                markerColor = QVector3D(0.0f, 1.0f, 0.0f);
-                break;  // Green for torus
+                markerColor = QVector3D(0.2f, 1.0f, 0.2f);
+                break;  // Bright green
             case 4:
-                markerColor = QVector3D(1.0f, 0.0f, 1.0f);
-                break;  // Magenta for tetrahedron
+                markerColor = QVector3D(1.0f, 0.2f, 1.0f);
+                break;  // Bright magenta
             default:
-                markerColor = QVector3D(0.8f, 0.8f, 0.8f);
-                break;
+                markerColor = QVector3D(0.9f, 0.9f, 0.2f);
+                break;  // Bright yellow
         }
 
         for (int i = 0; i < baseVertices.size(); ++i) {
             QVector3D movPos = (movableMatrix * QVector4D(baseVertices[i], 1.0f)).toVector3D();
-            renderVertexMarker(movPos, markerColor, 0.06f);  // Smaller for movable (1, 2, 3, 4)
+            renderVertexMarker(movPos, markerColor, 0.12f);  // Good size for movable (1, 2, 3, 4)
         }
     }
 }

@@ -49,8 +49,14 @@ class OpenGL3DRenderer : public QQuickFramebufferObject::Renderer, protected QOp
     void generateSphereMarkerGeometry();
     void renderVertexMarker(const QVector3D& position, const QVector3D& color, float scale = 0.05f);
 
+    // NEW: Text rendering methods
+    void renderTextBackground(const QVector3D& position, float size, const QVector3D& color);
+    void renderVertexNumber(const QVector3D& position, int number, bool isPrime,
+                            float scale = 0.15f);
+
     // OpenGL resources
     QOpenGLShaderProgram* m_program;
+    QOpenGLShaderProgram* m_textProgram;  // NEW: For text rendering
     QOpenGLBuffer* m_vertexBuffer;
     QOpenGLBuffer* m_indexBuffer;
     QOpenGLBuffer* m_normalBuffer;

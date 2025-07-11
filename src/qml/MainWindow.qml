@@ -431,7 +431,7 @@ Rectangle {
                    }
 
                    Text {
-                       text: "Target: < 0.100 units accuracy"
+                       text: "Target: < 0.300 units accuracy"
                        color: "#4CAF50"
                        font.pixelSize: 10
                        font.bold: true
@@ -464,69 +464,92 @@ Rectangle {
                }
            }
 
-           // Task Completion Overlay
+           // Task Completion Message (NEW)
            Rectangle {
-               id: completionOverlay
+               id: taskCompletionMessage
                anchors.centerIn: parent
-               width: 350
-               height: 200
-               color: "#4CAF50"
+               width: 400
+               height: 180
+               color: "#2E3440"
                opacity: 0.95
                radius: 12
                visible: false
+               z: 100
 
                Column {
                    anchors.centerIn: parent
-                   spacing: 12
+                   spacing: 15
 
                    Text {
-                       text: "🎉 Task Completed!"
-                       color: "#FFFFFF"
-                       font.pixelSize: 20
+                       text: "✅ Task Completed!"
+                       color: "#4CAF50"
+                       font.pixelSize: 22
                        font.bold: true
                        font.family: "Arial"
                        anchors.horizontalCenter: parent.horizontalCenter
                    }
 
                    Text {
-                       id: completionAccuracy
-                       text: "Accuracy: 0.045 units"
+                       id: taskSummaryText
+                       text: "You have completed the alignment task.\nGet ready for the next shape."
                        color: "#FFFFFF"
                        font.pixelSize: 14
-                       font.family: "Consolas, Monaco, monospace"
+                       font.family: "Arial"
                        anchors.horizontalCenter: parent.horizontalCenter
+                       horizontalAlignment: Text.AlignHCenter
                    }
 
-                   Text {
-                       id: completionTime
-                       text: "Time: 23.4 seconds"
-                       color: "#FFFFFF"
-                       font.pixelSize: 14
-                       font.family: "Consolas, Monaco, monospace"
+                   Row {
                        anchors.horizontalCenter: parent.horizontalCenter
-                   }
+                       spacing: 15
 
-                   Rectangle {
-                       width: 120
-                       height: 35
-                       color: "#FFFFFF"
-                       radius: 6
-                       anchors.horizontalCenter: parent.horizontalCenter
+                       Rectangle {
+                           width: 100
+                           height: 40
+                           color: "#4A90E2"
+                           radius: 8
 
-                       Text {
-                           anchors.centerIn: parent
-                           text: "Next Task"
-                           color: "#4CAF50"
-                           font.pixelSize: 12
-                           font.bold: true
-                           font.family: "Arial"
+                           Text {
+                               anchors.centerIn: parent
+                               text: "Next Shape"
+                               color: "#FFFFFF"
+                               font.pixelSize: 12
+                               font.bold: true
+                               font.family: "Arial"
+                           }
+
+                           MouseArea {
+                               anchors.fill: parent
+                               onClicked: {
+                                   taskCompletionMessage.visible = false
+                                   // Cycle to next shape
+                                   var nextShape = (viewport3D.currentShape % 4) + 1
+                                   viewport3D.currentShape = nextShape
+                                   viewport3D.startAlignmentTask()
+                               }
+                           }
                        }
 
-                       MouseArea {
-                           anchors.fill: parent
-                           onClicked: {
-                               completionOverlay.visible = false
-                               viewport3D.startAlignmentTask()
+                       Rectangle {
+                           width: 100
+                           height: 40
+                           color: "#607D8B"
+                           radius: 8
+
+                           Text {
+                               anchors.centerIn: parent
+                               text: "Close"
+                               color: "#FFFFFF"
+                               font.pixelSize: 12
+                               font.bold: true
+                               font.family: "Arial"
+                           }
+
+                           MouseArea {
+                               anchors.fill: parent
+                               onClicked: {
+                                   taskCompletionMessage.visible = false
+                               }
                            }
                        }
                    }
@@ -559,7 +582,11 @@ Rectangle {
 
                    Text {
                        text: "Accuracy: " + viewport3D.alignmentAccuracy.toFixed(3)
-                       color: viewport3D.alignmentAccuracy < 0.1 ? "#4CAF50" : "#FF9800"
+                       color: {
+                           if (viewport3D.alignmentAccuracy < 0.15) return "#4CAF50"      // Excellent - Green
+                           else if (viewport3D.alignmentAccuracy < 0.3) return "#FF9800"  // Good - Orange
+                           else return "#F44336"                                          // Needs work - Red
+                       }
                        font.pixelSize: 10
                        font.family: "Consolas, Monaco, monospace"
                        anchors.horizontalCenter: parent.horizontalCenter
@@ -663,12 +690,12 @@ Rectangle {
                        }
 
                        // Task Control Buttons
-                       Row {
+                       Column {
                            width: parent.width
                            spacing: 8
 
                            Rectangle {
-                               width: (parent.width - 8) / 2
+                               width: parent.width
                                height: 38
                                color: "#4CAF50"
                                radius: 6
@@ -691,26 +718,57 @@ Rectangle {
                                }
                            }
 
-                           Rectangle {
-                               width: (parent.width - 8) / 2
-                               height: 38
-                               color: "#F44336"
-                               radius: 6
+                           Row {
+                               width: parent.width
+                               spacing: 8
 
-                               Text {
-                                   anchors.centerIn: parent
-                                   text: "Reset"
-                                   font.pixelSize: 11
-                                   font.bold: true
-                                   color: "#FFFFFF"
-                                   font.family: "Arial"
+                               Rectangle {
+                                   width: (parent.width - 8) / 2
+                                   height: 38
+                                   color: viewport3D.taskActive ? "#FF9800" : "#CCCCCC"
+                                   radius: 6
+
+                                   Text {
+                                       anchors.centerIn: parent
+                                       text: "Finish Task"
+                                       font.pixelSize: 11
+                                       font.bold: true
+                                       color: "#FFFFFF"
+                                       font.family: "Arial"
+                                   }
+
+                                   MouseArea {
+                                       anchors.fill: parent
+                                       enabled: viewport3D.taskActive
+                                       onClicked: {
+                                           console.log("Task finished manually")
+                                           viewport3D.finishAlignmentTask()
+                                           taskCompletionMessage.visible = true
+                                       }
+                                   }
                                }
 
-                               MouseArea {
-                                   anchors.fill: parent
-                                   onClicked: {
-                                       console.log("Task reset")
-                                       viewport3D.resetTransform()
+                               Rectangle {
+                                   width: (parent.width - 8) / 2
+                                   height: 38
+                                   color: "#F44336"
+                                   radius: 6
+
+                                   Text {
+                                       anchors.centerIn: parent
+                                       text: "Reset"
+                                       font.pixelSize: 11
+                                       font.bold: true
+                                       color: "#FFFFFF"
+                                       font.family: "Arial"
+                                   }
+
+                                   MouseArea {
+                                       anchors.fill: parent
+                                       onClicked: {
+                                           console.log("Task reset")
+                                           viewport3D.resetTransform()
+                                       }
                                    }
                                }
                            }
@@ -741,7 +799,11 @@ Rectangle {
                                    text: viewport3D.alignmentAccuracy.toFixed(3) + " units"
                                    font.pixelSize: 14
                                    font.bold: true
-                                   color: viewport3D.alignmentAccuracy < 0.1 ? "#4CAF50" : "#FF9800"
+                                   color: {
+                                       if (viewport3D.alignmentAccuracy < 0.15) return "#4CAF50"      // Excellent - Green
+                                       else if (viewport3D.alignmentAccuracy < 0.3) return "#FF9800"  // Good - Orange
+                                       else return "#F44336"                                          // Needs work - Red
+                                   }
                                    font.family: "Consolas, Monaco, monospace"
                                    anchors.horizontalCenter: parent.horizontalCenter
                                }
@@ -1084,7 +1146,10 @@ Rectangle {
            console.log("Task completed! Accuracy:", accuracy, "Time:", timeMs, "ms")
            completionAccuracy.text = "Accuracy: " + accuracy.toFixed(3) + " units"
            completionTime.text = "Time: " + (timeMs / 1000.0).toFixed(1) + " seconds"
-           completionOverlay.visible = true
+
+           // Show completion message instead of overlay
+           taskSummaryText.text = "Task completed!\nAccuracy: " + accuracy.toFixed(3) + " units\nTime: " + (timeMs / 1000.0).toFixed(1) + " seconds\n\nReady for next shape?"
+           taskCompletionMessage.visible = true
        }
    }
 }

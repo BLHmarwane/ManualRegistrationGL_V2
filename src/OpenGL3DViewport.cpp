@@ -1,9 +1,9 @@
 #include "OpenGL3DViewport.hpp"
 
 #include <QDebug>
+#include <QKeyEvent>
 #include <QOpenGLShaderProgram>
 #include <QtMath>
-
 // Enhanced vertex shader with lighting support
 static const char* vertexShaderSource =
     "#version 330 core\n"
@@ -523,13 +523,171 @@ OpenGL3DViewport::OpenGL3DViewport(QQuickItem* parent)
       ,
       m_rotation(15.0f, 25.0f, 0.0f)  // Initial 3D rotation
       ,
-      m_scale(1.0f) {
+      m_scale(1.0f),
+      m_mousePressed(false),            // NEW: Initialize mouse state
+      m_activeButton(Qt::NoButton),     // NEW
+      m_rotationSensitivity(0.5f),      // NEW: Sensitivity settings
+      m_translationSensitivity(0.01f),  // NEW
+      m_scaleSensitivity(0.1f)          // NEW
+{
     setMirrorVertically(true);
+
+    // NEW: Enable mouse tracking and accept mouse events
+    setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton | Qt::MiddleButton);
+    setAcceptHoverEvents(true);
+    setFlag(QQuickItem::ItemAcceptsInputMethod, true);  // NEW
+    setFlag(QQuickItem::ItemIsFocusScope, true);        // NEW
+    setFocus(true);                                     // NEW
 
     // Setup animation timer
     m_animationTimer = new QTimer(this);
     connect(m_animationTimer, &QTimer::timeout, this, &OpenGL3DViewport::updateAnimation);
     m_animationTimer->start(33);  // 30 FPS
+}
+
+// NEW: Mouse interaction methods implementation
+
+void OpenGL3DViewport::handleMousePress(QMouseEvent* event) {
+    m_mousePressed = true;
+    m_lastMousePos = event->pos();
+    m_activeButton = event->button();
+    emit mousePressedChanged();  // NEW: Emit signal for QML
+    qDebug() << "Mouse pressed:" << event->button() << "at" << event->pos();
+
+    // Accept the event to enable mouse tracking
+    event->accept();
+}
+
+void OpenGL3DViewport::handleMouseMove(QMouseEvent* event) {
+    if (!m_mousePressed) {
+        return;
+    }
+
+    QPoint currentPos = event->pos();
+    QPoint delta = currentPos - m_lastMousePos;
+
+    if (delta.isNull()) {
+        return;
+    }
+
+    // Apply transformations based on which mouse button is pressed
+    switch (m_activeButton) {
+        case Qt::LeftButton:
+            // Left button: Rotate object
+            applyRotationDelta(delta);
+            break;
+
+        case Qt::RightButton:
+            // Right button: Translate object in XY plane
+            applyTranslationDelta(delta);
+            break;
+
+        case Qt::MiddleButton:
+            // Middle button: Scale object
+            applyScaleDelta(delta);
+            break;
+
+        default:
+            break;
+    }
+
+    m_lastMousePos = currentPos;
+    event->accept();
+}
+
+void OpenGL3DViewport::handleMouseRelease(QMouseEvent* event) {
+    m_mousePressed = false;
+    m_activeButton = Qt::NoButton;
+    emit mousePressedChanged();  // NEW: Emit signal for QML
+    qDebug() << "Mouse released:" << event->button();
+    event->accept();
+}
+
+void OpenGL3DViewport::handleWheelEvent(QWheelEvent* event) {
+    // Mouse wheel: Scale object or translate in Z
+    QPoint angleDelta = event->angleDelta();
+
+    if (!angleDelta.isNull()) {
+        float delta = angleDelta.y() / 120.0f;  // Standard wheel step
+
+        // Check if Ctrl is pressed for Z translation, otherwise scale
+        if (event->modifiers() & Qt::ControlModifier) {
+            // Ctrl + wheel: Translate in Z direction
+            QVector3D newTranslation = m_translation;
+            newTranslation.setZ(newTranslation.z() + delta * 0.1f);
+            setTranslation(newTranslation);
+        } else {
+            // Normal wheel: Scale object
+            float scaleFactor = 1.0f + (delta * 0.1f);
+            float newScale = qBound(0.1f, m_scale * scaleFactor, 5.0f);
+            setScale(newScale);
+        }
+
+        qDebug() << "Wheel event:" << delta << "New scale/translation:" << m_scale;
+    }
+
+    event->accept();
+}
+
+// NEW: Helper methods for applying transformations
+
+void OpenGL3DViewport::applyRotationDelta(const QPoint& delta) {
+    // Convert mouse movement to rotation
+    float deltaX = delta.x() * m_rotationSensitivity;
+    float deltaY = delta.y() * m_rotationSensitivity;
+
+    // Apply rotation around Y axis (horizontal mouse movement)
+    // and around X axis (vertical mouse movement)
+    QVector3D newRotation = m_rotation;
+    newRotation.setY(newRotation.y() + deltaX);
+    newRotation.setX(newRotation.x() - deltaY);  // Inverted for natural feel
+
+    // Clamp X rotation to avoid gimbal lock
+    newRotation.setX(qBound(-89.0f, newRotation.x(), 89.0f));
+
+    setRotation(newRotation);
+}
+
+void OpenGL3DViewport::applyTranslationDelta(const QPoint& delta) {
+    // Convert mouse movement to translation in screen space
+    float deltaX = delta.x() * m_translationSensitivity;
+    float deltaY = -delta.y() * m_translationSensitivity;  // Inverted Y for natural feel
+
+    QVector3D newTranslation = m_translation;
+    newTranslation.setX(newTranslation.x() + deltaX);
+    newTranslation.setY(newTranslation.y() + deltaY);
+
+    // Limit translation range
+    newTranslation.setX(qBound(-5.0f, newTranslation.x(), 5.0f));
+    newTranslation.setY(qBound(-5.0f, newTranslation.y(), 5.0f));
+
+    setTranslation(newTranslation);
+}
+
+void OpenGL3DViewport::applyScaleDelta(const QPoint& delta) {
+    // Use vertical mouse movement for scaling
+    float deltaY = -delta.y() * m_scaleSensitivity * 0.01f;
+    float scaleFactor = 1.0f + deltaY;
+    float newScale = qBound(0.1f, m_scale * scaleFactor, 5.0f);
+
+    setScale(newScale);
+}
+
+// NEW: Override mouse event handlers in QQuickItem
+void OpenGL3DViewport::mousePressEvent(QMouseEvent* event) {
+    handleMousePress(event);
+}
+
+void OpenGL3DViewport::mouseMoveEvent(QMouseEvent* event) {
+    handleMouseMove(event);
+}
+
+void OpenGL3DViewport::mouseReleaseEvent(QMouseEvent* event) {
+    handleMouseRelease(event);
+}
+
+void OpenGL3DViewport::wheelEvent(QWheelEvent* event) {
+    handleWheelEvent(event);
 }
 
 QQuickFramebufferObject::Renderer* OpenGL3DViewport::createRenderer() const {
@@ -578,6 +736,171 @@ void OpenGL3DViewport::resetTransform() {
 
 void OpenGL3DViewport::updateAnimation() {
     update();  // Trigger re-render
+}
+// NEW: Keyboard event handler
+// Enhanced keyboard event handler with better feedback
+void OpenGL3DViewport::keyPressEvent(QKeyEvent* event) {
+    const float step = 0.1f;       // Translation step
+    const float rotStep = 5.0f;    // Rotation step in degrees
+    const float scaleStep = 0.1f;  // Scale step
+
+    bool handled = true;
+    QString action;  // For logging
+
+    switch (event->key()) {
+        // Translation controls
+        case Qt::Key_W:
+        case Qt::Key_Up:
+            setTranslation(m_translation + QVector3D(0, step, 0));
+            action = "Move Up";
+            break;
+        case Qt::Key_S:
+        case Qt::Key_Down:
+            setTranslation(m_translation + QVector3D(0, -step, 0));
+            action = "Move Down";
+            break;
+        case Qt::Key_A:
+        case Qt::Key_Left:
+            setTranslation(m_translation + QVector3D(-step, 0, 0));
+            action = "Move Left";
+            break;
+        case Qt::Key_D:
+        case Qt::Key_Right:
+            setTranslation(m_translation + QVector3D(step, 0, 0));
+            action = "Move Right";
+            break;
+        case Qt::Key_Q:
+            setTranslation(m_translation + QVector3D(0, 0, step));
+            action = "Move Forward";
+            break;
+        case Qt::Key_E:
+            setTranslation(m_translation + QVector3D(0, 0, -step));
+            action = "Move Back";
+            break;
+
+        // Rotation controls (with Shift modifier)
+        case Qt::Key_I:
+            if (event->modifiers() & Qt::ShiftModifier) {
+                setRotation(m_rotation + QVector3D(rotStep, 0, 0));
+                action = "Rotate X+";
+            } else {
+                handled = false;
+            }
+            break;
+        case Qt::Key_K:
+            if (event->modifiers() & Qt::ShiftModifier) {
+                setRotation(m_rotation + QVector3D(-rotStep, 0, 0));
+                action = "Rotate X-";
+            } else {
+                handled = false;
+            }
+            break;
+        case Qt::Key_J:
+            if (event->modifiers() & Qt::ShiftModifier) {
+                setRotation(m_rotation + QVector3D(0, -rotStep, 0));
+                action = "Rotate Y-";
+            } else {
+                handled = false;
+            }
+            break;
+        case Qt::Key_L:
+            if (event->modifiers() & Qt::ShiftModifier) {
+                setRotation(m_rotation + QVector3D(0, rotStep, 0));
+                action = "Rotate Y+";
+            } else {
+                handled = false;
+            }
+            break;
+        case Qt::Key_U:
+            if (event->modifiers() & Qt::ShiftModifier) {
+                setRotation(m_rotation + QVector3D(0, 0, rotStep));
+                action = "Rotate Z+";
+            } else {
+                handled = false;
+            }
+            break;
+        case Qt::Key_O:
+            if (event->modifiers() & Qt::ShiftModifier) {
+                setRotation(m_rotation + QVector3D(0, 0, -rotStep));
+                action = "Rotate Z-";
+            } else {
+                handled = false;
+            }
+            break;
+
+        // Scale controls
+        case Qt::Key_Plus:
+        case Qt::Key_Equal:
+            setScale(qBound(0.1f, m_scale + scaleStep, 5.0f));
+            action = "Scale Up";
+            break;
+        case Qt::Key_Minus:
+            setScale(qBound(0.1f, m_scale - scaleStep, 5.0f));
+            action = "Scale Down";
+            break;
+
+        // Reset
+        case Qt::Key_R:
+            if (event->modifiers() & Qt::ControlModifier) {
+                resetTransform();
+                action = "Reset Transform";
+            } else {
+                handled = false;
+            }
+            break;
+
+        // Shape selection
+        case Qt::Key_1:
+            setCurrentShape(1);
+            action = "Select Cube";
+            break;
+        case Qt::Key_2:
+            setCurrentShape(2);
+            action = "Select Sphere";
+            break;
+        case Qt::Key_3:
+            setCurrentShape(3);
+            action = "Select Torus";
+            break;
+        case Qt::Key_4:
+            setCurrentShape(4);
+            action = "Select Tetrahedron";
+            break;
+
+        default:
+            handled = false;
+            break;
+    }
+
+    if (handled) {
+        event->accept();
+        qDebug() << "Keyboard action:" << action;
+    } else {
+        QQuickFramebufferObject::keyPressEvent(event);
+    }
+}
+
+void OpenGL3DViewport::focusInEvent(QFocusEvent* event) {
+    qDebug() << "3D Viewport gained focus - keyboard shortcuts active";
+    QQuickFramebufferObject::focusInEvent(event);
+}
+
+// NEW: Add sensitivity adjustment methods
+void OpenGL3DViewport::setRotationSensitivity(float sensitivity) {
+    m_rotationSensitivity = qBound(0.1f, sensitivity, 2.0f);
+}
+
+void OpenGL3DViewport::setTranslationSensitivity(float sensitivity) {
+    float newSensitivity = qBound(0.001f, sensitivity, 0.1f);
+    if (qAbs(m_translationSensitivity - newSensitivity) > 0.0001f) {
+        m_translationSensitivity = newSensitivity;
+        emit sensitivityChanged();
+        qDebug() << "Translation sensitivity changed to:" << m_translationSensitivity;
+    }
+}
+
+void OpenGL3DViewport::setScaleSensitivity(float sensitivity) {
+    m_scaleSensitivity = qBound(0.01f, sensitivity, 1.0f);
 }
 
 // REMOVED: #include "OpenGL3DViewport.moc" - This was causing the MOC warning

@@ -1,10 +1,9 @@
-// Complete updated OpenGL3DViewport.hpp with all mouse and keyboard support
-
 #ifndef OPENGL3DVIEWPORT_HPP
 #define OPENGL3DVIEWPORT_HPP
 
-#include <QFocusEvent>  // NEW
-#include <QKeyEvent>    // NEW
+#include <QElapsedTimer>
+#include <QFocusEvent>
+#include <QKeyEvent>
 #include <QMatrix4x4>
 #include <QMouseEvent>
 #include <QOpenGLBuffer>
@@ -40,16 +39,36 @@ class OpenGL3DRenderer : public QQuickFramebufferObject::Renderer, protected QOp
     void generateTetrahedronGeometry();
     void updateBuffers();
 
+    // NEW: Dual model rendering methods
+    void renderReferenceModel();
+    void renderMovableModel();
+    void renderVertexLabels();
+    void calculateCornerVertices();
+
+    // NEW: Vertex marker rendering
+    void generateSphereMarkerGeometry();
+    void renderVertexMarker(const QVector3D& position, const QVector3D& color, float scale = 0.05f);
+
     // OpenGL resources
     QOpenGLShaderProgram* m_program;
     QOpenGLBuffer* m_vertexBuffer;
     QOpenGLBuffer* m_indexBuffer;
     QOpenGLBuffer* m_normalBuffer;
 
+    // NEW: Sphere marker buffers
+    QOpenGLBuffer* m_sphereVertexBuffer;
+    QOpenGLBuffer* m_sphereIndexBuffer;
+    QOpenGLBuffer* m_sphereNormalBuffer;
+
     // Shape data
     QVector<float> m_vertices;
     QVector<float> m_normals;
     QVector<unsigned int> m_indices;
+
+    // NEW: Sphere marker data
+    QVector<float> m_sphereVertices;
+    QVector<float> m_sphereNormals;
+    QVector<unsigned int> m_sphereIndices;
 
     // Transform state
     QMatrix4x4 m_modelMatrix;
@@ -61,6 +80,15 @@ class OpenGL3DRenderer : public QQuickFramebufferObject::Renderer, protected QOp
     QVector3D m_translation;
     QQuaternion m_rotation;
     float m_scale;
+
+    // NEW: Research display settings
+    bool m_showReferenceModel;
+    bool m_showMovableModel;
+    bool m_showVertexLabels;
+
+    // NEW: Vertex positions for labeling
+    QVector<QVector3D> m_referenceVertices;
+    QVector<QVector3D> m_movableVertices;
 
     // State
     bool m_initialized;
@@ -74,7 +102,7 @@ class OpenGL3DViewport : public QQuickFramebufferObject {
     Q_PROPERTY(QVector3D rotation READ rotation WRITE setRotation NOTIFY transformChanged)
     Q_PROPERTY(float scale READ scale WRITE setScale NOTIFY transformChanged)
 
-    // NEW: Expose mouse state and sensitivity properties to QML
+    // Mouse state and sensitivity properties
     Q_PROPERTY(bool mousePressed READ mousePressed NOTIFY mousePressedChanged)
     Q_PROPERTY(float rotationSensitivity READ rotationSensitivity WRITE setRotationSensitivity
                    NOTIFY sensitivityChanged)
@@ -82,6 +110,16 @@ class OpenGL3DViewport : public QQuickFramebufferObject {
                    setTranslationSensitivity NOTIFY sensitivityChanged)
     Q_PROPERTY(float scaleSensitivity READ scaleSensitivity WRITE setScaleSensitivity NOTIFY
                    sensitivityChanged)
+
+    // NEW: Research-specific properties
+    Q_PROPERTY(bool showReferenceModel READ showReferenceModel WRITE setShowReferenceModel NOTIFY
+                   displayChanged)
+    Q_PROPERTY(
+        bool showMovableModel READ showMovableModel WRITE setShowMovableModel NOTIFY displayChanged)
+    Q_PROPERTY(
+        bool showVertexLabels READ showVertexLabels WRITE setShowVertexLabels NOTIFY displayChanged)
+    Q_PROPERTY(float alignmentAccuracy READ alignmentAccuracy NOTIFY alignmentChanged)
+    Q_PROPERTY(bool taskActive READ taskActive NOTIFY taskStateChanged)
 
    public:
     enum Shape { CUBE = 1, SPHERE = 2, TORUS = 3, TETRAHEDRON = 4 };
@@ -105,7 +143,7 @@ class OpenGL3DViewport : public QQuickFramebufferObject {
         return m_scale;
     }
 
-    // NEW: Mouse and sensitivity getters
+    // Mouse and sensitivity getters
     bool mousePressed() const {
         return m_mousePressed;
     }
@@ -117,6 +155,23 @@ class OpenGL3DViewport : public QQuickFramebufferObject {
     }
     float scaleSensitivity() const {
         return m_scaleSensitivity;
+    }
+
+    // NEW: Research-specific getters
+    bool showReferenceModel() const {
+        return m_showReferenceModel;
+    }
+    bool showMovableModel() const {
+        return m_showMovableModel;
+    }
+    bool showVertexLabels() const {
+        return m_showVertexLabels;
+    }
+    float alignmentAccuracy() const {
+        return m_alignmentAccuracy;
+    }
+    bool taskActive() const {
+        return m_taskActive;
     }
 
    public slots:
@@ -132,16 +187,33 @@ class OpenGL3DViewport : public QQuickFramebufferObject {
     void handleMouseRelease(QMouseEvent* event);
     void handleWheelEvent(QWheelEvent* event);
 
-    // NEW: Sensitivity setters
+    // Sensitivity setters
     void setRotationSensitivity(float sensitivity);
     void setTranslationSensitivity(float sensitivity);
     void setScaleSensitivity(float sensitivity);
 
+    // NEW: Research-specific setters
+    void setShowReferenceModel(bool show);
+    void setShowMovableModel(bool show);
+    void setShowVertexLabels(bool show);
+    void calculateAlignmentAccuracy();
+
+    // NEW: Research task methods
+    Q_INVOKABLE void startAlignmentTask();
+    Q_INVOKABLE void finishAlignmentTask();
+    Q_INVOKABLE void nextInteractionMode();
+
    signals:
     void currentShapeChanged();
     void transformChanged();
-    void mousePressedChanged();  // NEW
-    void sensitivityChanged();   // NEW
+    void mousePressedChanged();
+    void sensitivityChanged();
+
+    // NEW: Research-specific signals
+    void displayChanged();
+    void alignmentChanged();
+    void taskStateChanged();
+    void alignmentCompleted(float accuracy, int timeMs);
 
    protected:
     // Override QQuickItem event handlers
@@ -149,8 +221,8 @@ class OpenGL3DViewport : public QQuickFramebufferObject {
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
-    void keyPressEvent(QKeyEvent* event) override;   // NEW
-    void focusInEvent(QFocusEvent* event) override;  // NEW
+    void keyPressEvent(QKeyEvent* event) override;
+    void focusInEvent(QFocusEvent* event) override;
 
    private slots:
     void updateAnimation();
@@ -175,6 +247,14 @@ class OpenGL3DViewport : public QQuickFramebufferObject {
     float m_rotationSensitivity;
     float m_translationSensitivity;
     float m_scaleSensitivity;
+
+    // NEW: Research data
+    bool m_showReferenceModel;
+    bool m_showMovableModel;
+    bool m_showVertexLabels;
+    float m_alignmentAccuracy;
+    QElapsedTimer m_taskStartTime;
+    bool m_taskActive;
 };
 
 #endif  // OPENGL3DVIEWPORT_HPP

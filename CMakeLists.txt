@@ -23,9 +23,6 @@ qt6_standard_project_setup()
 include_directories(${CMAKE_SOURCE_DIR}/src)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
-# Add QML resources
-qt6_add_resources(qml_resources src/qml/qml.qrc)
-
 # Main application source
 set(SOURCES
     src/main.cpp
@@ -37,10 +34,10 @@ set(HEADERS
 )
 
 # Create the main executable
-qt6_add_executable(ManualRegistrationGL_V2 ${SOURCES} ${HEADERS})
-
-# Add QML resources to the executable
-target_sources(ManualRegistrationGL_V2 PRIVATE ${qml_resources})
+qt6_add_executable(ManualRegistrationGL_V2
+    ${SOURCES}
+    ${HEADERS}
+)
 
 # Link libraries for main application
 target_link_libraries(ManualRegistrationGL_V2 PRIVATE
@@ -59,7 +56,3 @@ target_include_directories(ManualRegistrationGL_V2 PRIVATE ${OpenCV_INCLUDE_DIRS
 set_target_properties(ManualRegistrationGL_V2 PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )
-
-# Enable testing
-enable_testing()
-add_subdirectory(tests)

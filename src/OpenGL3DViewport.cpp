@@ -3,8 +3,10 @@
 #include <QDebug>
 #include <QKeyEvent>
 #include <QOpenGLShaderProgram>
+#include <QRandomGenerator>
 #include <QtMath>
-// Enhanced vertex shader with lighting support
+
+// Enhanced vertex shader with lighting and alpha support
 static const char* vertexShaderSource =
     "#version 330 core\n"
     "layout (location = 0) in vec3 aPos;\n"
@@ -21,7 +23,7 @@ static const char* vertexShaderSource =
     "   gl_Position = mvpMatrix * vec4(aPos, 1.0);\n"
     "}\n";
 
-// Enhanced fragment shader with lighting
+// Enhanced fragment shader with lighting and alpha
 static const char* fragmentShaderSource =
     "#version 330 core\n"
     "in vec3 FragPos;\n"
@@ -30,6 +32,7 @@ static const char* fragmentShaderSource =
     "uniform vec3 color;\n"
     "uniform vec3 lightPos;\n"
     "uniform vec3 viewPos;\n"
+    "uniform float alpha;\n"
     "void main()\n"
     "{\n"
     "   // Ambient lighting\n"
@@ -50,7 +53,7 @@ static const char* fragmentShaderSource =
     "   vec3 specular = specularStrength * spec * vec3(1.0, 1.0, 1.0);\n"
     "   \n"
     "   vec3 result = ambient + diffuse + specular;\n"
-    "   FragColor = vec4(result, 1.0);\n"
+    "   FragColor = vec4(result, alpha);\n"
     "}\n";
 
 // OpenGL3DRenderer Implementation
@@ -59,10 +62,16 @@ OpenGL3DRenderer::OpenGL3DRenderer()
       m_vertexBuffer(nullptr),
       m_indexBuffer(nullptr),
       m_normalBuffer(nullptr),
+      m_sphereVertexBuffer(nullptr),
+      m_sphereIndexBuffer(nullptr),
+      m_sphereNormalBuffer(nullptr),
       m_currentShape(4),
       m_translation(0.0f, 0.0f, 0.0f),
       m_scale(1.0f),
-      m_initialized(false) {
+      m_initialized(false),
+      m_showReferenceModel(true),
+      m_showMovableModel(true),
+      m_showVertexLabels(true) {
     // Set initial rotation for better 3D viewing
     m_rotation = QQuaternion::fromEulerAngles(15.0f, 25.0f, 0.0f);
 }
@@ -72,6 +81,9 @@ OpenGL3DRenderer::~OpenGL3DRenderer() {
     delete m_vertexBuffer;
     delete m_indexBuffer;
     delete m_normalBuffer;
+    delete m_sphereVertexBuffer;
+    delete m_sphereIndexBuffer;
+    delete m_sphereNormalBuffer;
 }
 
 void OpenGL3DRenderer::render() {
@@ -80,14 +92,41 @@ void OpenGL3DRenderer::render() {
         m_initialized = true;
     }
 
-    // Clear with nice background color
-    glClearColor(0.2f, 0.3f, 0.4f, 1.0f);
+    // Clear with research-appropriate background
+    glClearColor(0.15f, 0.15f, 0.2f, 1.0f);  // Dark blue-gray for contrast
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    renderShape();
+    // Setup camera matrices (shared by both models)
+    m_projectionMatrix.setToIdentity();
+    float aspect = float(m_viewportSize.width()) / float(m_viewportSize.height());
+    m_projectionMatrix.perspective(45.0f, aspect, 0.1f, 100.0f);
+
+    m_viewMatrix.setToIdentity();
+    QVector3D cameraPos(4.0f, 3.0f, 6.0f);
+    QVector3D target(0.0f, 0.0f, 0.0f);
+    QVector3D up(0.0f, 1.0f, 0.0f);
+    m_viewMatrix.lookAt(cameraPos, target, up);
+
+    // Render both models
+    if (m_showReferenceModel) {
+        renderReferenceModel();
+    }
+
+    if (m_showMovableModel) {
+        renderMovableModel();
+    }
+
+    // Render vertex labels on top
+    if (m_showVertexLabels) {
+        renderVertexLabels();
+    }
+
+    glDisable(GL_BLEND);
 }
 
 QOpenGLFramebufferObject* OpenGL3DRenderer::createFramebufferObject(const QSize& size) {
@@ -113,13 +152,18 @@ void OpenGL3DRenderer::synchronize(QQuickFramebufferObject* item) {
         m_rotation = QQuaternion::fromEulerAngles(rot.x(), rot.y(), rot.z());
 
         m_scale = viewport->scale();
+
+        // NEW: Sync research display settings
+        m_showReferenceModel = viewport->showReferenceModel();
+        m_showMovableModel = viewport->showMovableModel();
+        m_showVertexLabels = viewport->showVertexLabels();
     }
 }
 
 void OpenGL3DRenderer::initializeGL() {
     initializeOpenGLFunctions();
 
-    qDebug() << "Initializing OpenGL...";
+    qDebug() << "Initializing OpenGL for dual-model research...";
     qDebug() << "OpenGL version:" << (char*)glGetString(GL_VERSION);
 
     if (!setupShaders()) {
@@ -128,8 +172,9 @@ void OpenGL3DRenderer::initializeGL() {
     }
 
     generateGeometry();
+    generateSphereMarkerGeometry();  // NEW: Generate sphere markers
 
-    qDebug() << "OpenGL 3D Renderer initialized successfully";
+    qDebug() << "Research OpenGL 3D Renderer initialized successfully";
 }
 
 bool OpenGL3DRenderer::setupShaders() {
@@ -154,76 +199,45 @@ bool OpenGL3DRenderer::setupShaders() {
     return true;
 }
 
-void OpenGL3DRenderer::renderShape() {
+void OpenGL3DRenderer::renderReferenceModel() {
     if (!m_program || !m_vertexBuffer || !m_indexBuffer || m_vertices.isEmpty()) {
         return;
     }
 
     m_program->bind();
 
-    // Setup camera and projection
-    m_projectionMatrix.setToIdentity();
-    float aspect = float(m_viewportSize.width()) / float(m_viewportSize.height());
-    m_projectionMatrix.perspective(45.0f, aspect, 0.1f, 100.0f);
+    // REFERENCE MODEL: Fixed at origin with good viewing angle
+    QMatrix4x4 referenceMatrix;
+    referenceMatrix.setToIdentity();
+    // Apply a fixed rotation for good 3D visualization
+    referenceMatrix.rotate(QQuaternion::fromEulerAngles(15.0f, 25.0f, 0.0f));
 
-    // Position camera for good 3D viewing
-    m_viewMatrix.setToIdentity();
-    QVector3D cameraPos(4.0f, 3.0f, 6.0f);
-    QVector3D target(0.0f, 0.0f, 0.0f);
-    QVector3D up(0.0f, 1.0f, 0.0f);
-    m_viewMatrix.lookAt(cameraPos, target, up);
-
-    // Apply model transformations
-    m_modelMatrix.setToIdentity();
-    m_modelMatrix.translate(m_translation);
-    m_modelMatrix.rotate(m_rotation);
-    m_modelMatrix.scale(m_scale);
-
-    // Calculate matrices
-    QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
-    QMatrix3x3 normalMatrix = m_modelMatrix.normalMatrix();
+    QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * referenceMatrix;
+    QMatrix3x3 normalMatrix = referenceMatrix.normalMatrix();
 
     // Set uniforms
     m_program->setUniformValue("mvpMatrix", mvpMatrix);
-    m_program->setUniformValue("modelMatrix", m_modelMatrix);
+    m_program->setUniformValue("modelMatrix", referenceMatrix);
     m_program->setUniformValue("normalMatrix", normalMatrix);
     m_program->setUniformValue("lightPos", QVector3D(5.0f, 5.0f, 5.0f));
-    m_program->setUniformValue("viewPos", cameraPos);
+    m_program->setUniformValue("viewPos", QVector3D(4.0f, 3.0f, 6.0f));
 
-    // Set color based on shape
-    QVector3D color;
-    switch (m_currentShape) {
-        case 1:
-            color = QVector3D(0.8f, 0.2f, 0.2f);
-            break;  // Red cube
-        case 2:
-            color = QVector3D(0.2f, 0.2f, 0.8f);
-            break;  // Blue sphere
-        case 3:
-            color = QVector3D(0.2f, 0.8f, 0.2f);
-            break;  // Green torus
-        case 4:
-            color = QVector3D(0.8f, 0.2f, 0.8f);
-            break;  // Magenta tetrahedron
-        default:
-            color = QVector3D(0.5f, 0.5f, 0.5f);
-            break;
-    }
-    m_program->setUniformValue("color", color);
+    // REFERENCE MODEL COLOR: Semi-transparent gray with good visibility
+    QVector3D referenceColor(0.7f, 0.7f, 0.8f);  // Light blue-gray
+    m_program->setUniformValue("color", referenceColor);
+    m_program->setUniformValue("alpha", 0.4f);
 
-    // Bind vertex data
+    // Bind and render with transparency
     m_vertexBuffer->bind();
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
 
-    // Bind normal data if available
     if (m_normalBuffer && !m_normals.isEmpty()) {
         m_normalBuffer->bind();
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
     }
 
-    // Bind index buffer and draw
     m_indexBuffer->bind();
     glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, 0);
 
@@ -233,10 +247,295 @@ void OpenGL3DRenderer::renderShape() {
         glDisableVertexAttribArray(1);
         m_normalBuffer->release();
     }
-
     m_indexBuffer->release();
     m_vertexBuffer->release();
     m_program->release();
+}
+
+void OpenGL3DRenderer::renderMovableModel() {
+    if (!m_program || !m_vertexBuffer || !m_indexBuffer || m_vertices.isEmpty()) {
+        return;
+    }
+
+    m_program->bind();
+
+    // MOVABLE MODEL: Apply user transformations
+    QMatrix4x4 movableMatrix;
+    movableMatrix.setToIdentity();
+    movableMatrix.translate(m_translation);
+    movableMatrix.rotate(m_rotation);
+    movableMatrix.scale(m_scale);
+
+    QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * movableMatrix;
+    QMatrix3x3 normalMatrix = movableMatrix.normalMatrix();
+
+    // Set uniforms
+    m_program->setUniformValue("mvpMatrix", mvpMatrix);
+    m_program->setUniformValue("modelMatrix", movableMatrix);
+    m_program->setUniformValue("normalMatrix", normalMatrix);
+    m_program->setUniformValue("lightPos", QVector3D(5.0f, 5.0f, 5.0f));
+    m_program->setUniformValue("viewPos", QVector3D(4.0f, 3.0f, 6.0f));
+
+    // MOVABLE MODEL COLOR: Distinct bright color based on shape
+    QVector3D movableColor;
+    switch (m_currentShape) {
+        case 1:
+            movableColor = QVector3D(1.0f, 0.3f, 0.3f);
+            break;  // Bright red cube
+        case 2:
+            movableColor = QVector3D(0.3f, 0.6f, 1.0f);
+            break;  // Bright blue sphere
+        case 3:
+            movableColor = QVector3D(0.3f, 1.0f, 0.3f);
+            break;  // Bright green torus
+        case 4:
+            movableColor = QVector3D(1.0f, 0.3f, 1.0f);
+            break;  // Bright magenta tetrahedron
+        default:
+            movableColor = QVector3D(0.8f, 0.8f, 0.8f);
+            break;
+    }
+    m_program->setUniformValue("color", movableColor);
+
+    // Bind geometry
+    m_vertexBuffer->bind();
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+
+    if (m_normalBuffer && !m_normals.isEmpty()) {
+        m_normalBuffer->bind();
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+    }
+
+    m_indexBuffer->bind();
+
+    // First pass: Semi-transparent fill
+    m_program->setUniformValue("alpha", 0.3f);
+    glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, 0);
+
+    // Second pass: Solid wireframe edges
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    glLineWidth(3.0f);  // Thick edges for visibility
+    m_program->setUniformValue("alpha", 1.0f);
+    glDrawElements(GL_TRIANGLES, m_indices.size(), GL_UNSIGNED_INT, 0);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);  // Restore fill mode
+
+    // Cleanup
+    glDisableVertexAttribArray(0);
+    if (m_normalBuffer && !m_normals.isEmpty()) {
+        glDisableVertexAttribArray(1);
+        m_normalBuffer->release();
+    }
+    m_indexBuffer->release();
+    m_vertexBuffer->release();
+    m_program->release();
+}
+
+void OpenGL3DRenderer::generateSphereMarkerGeometry() {
+    const int stacks = 8;  // Lower resolution for markers
+    const int slices = 12;
+    const float radius = 1.0f;  // Will be scaled when rendering
+
+    m_sphereVertices.clear();
+    m_sphereNormals.clear();
+    m_sphereIndices.clear();
+
+    // Generate vertices and normals
+    for (int i = 0; i <= stacks; ++i) {
+        float phi = M_PI * float(i) / float(stacks);
+        float cosPhi = cos(phi);
+        float sinPhi = sin(phi);
+
+        for (int j = 0; j <= slices; ++j) {
+            float theta = 2.0f * M_PI * float(j) / float(slices);
+            float cosTheta = cos(theta);
+            float sinTheta = sin(theta);
+
+            // Calculate vertex position
+            float x = radius * sinPhi * cosTheta;
+            float y = radius * cosPhi;
+            float z = radius * sinPhi * sinTheta;
+
+            m_sphereVertices.append(x);
+            m_sphereVertices.append(y);
+            m_sphereVertices.append(z);
+
+            // Normal is same as position for unit sphere
+            m_sphereNormals.append(x);
+            m_sphereNormals.append(y);
+            m_sphereNormals.append(z);
+        }
+    }
+
+    // Generate indices
+    for (int i = 0; i < stacks; ++i) {
+        for (int j = 0; j < slices; ++j) {
+            int first = i * (slices + 1) + j;
+            int second = first + slices + 1;
+
+            m_sphereIndices.append(first);
+            m_sphereIndices.append(second);
+            m_sphereIndices.append(first + 1);
+
+            m_sphereIndices.append(second);
+            m_sphereIndices.append(second + 1);
+            m_sphereIndices.append(first + 1);
+        }
+    }
+
+    // Create sphere marker buffers
+    if (!m_sphereVertexBuffer) {
+        m_sphereVertexBuffer = new QOpenGLBuffer(QOpenGLBuffer::VertexBuffer);
+        m_sphereVertexBuffer->create();
+    }
+    m_sphereVertexBuffer->bind();
+    m_sphereVertexBuffer->allocate(m_sphereVertices.constData(),
+                                   m_sphereVertices.size() * sizeof(float));
+    m_sphereVertexBuffer->release();
+
+    if (!m_sphereNormalBuffer) {
+        m_sphereNormalBuffer = new QOpenGLBuffer(QOpenGLBuffer::VertexBuffer);
+        m_sphereNormalBuffer->create();
+    }
+    m_sphereNormalBuffer->bind();
+    m_sphereNormalBuffer->allocate(m_sphereNormals.constData(),
+                                   m_sphereNormals.size() * sizeof(float));
+    m_sphereNormalBuffer->release();
+
+    if (!m_sphereIndexBuffer) {
+        m_sphereIndexBuffer = new QOpenGLBuffer(QOpenGLBuffer::IndexBuffer);
+        m_sphereIndexBuffer->create();
+    }
+    m_sphereIndexBuffer->bind();
+    m_sphereIndexBuffer->allocate(m_sphereIndices.constData(),
+                                  m_sphereIndices.size() * sizeof(unsigned int));
+    m_sphereIndexBuffer->release();
+}
+
+void OpenGL3DRenderer::renderVertexMarker(const QVector3D& position, const QVector3D& color,
+                                          float scale) {
+    if (!m_program || !m_sphereVertexBuffer || !m_sphereIndexBuffer) {
+        return;
+    }
+
+    m_program->bind();
+
+    // Create marker transformation matrix
+    QMatrix4x4 markerMatrix;
+    markerMatrix.translate(position);
+    markerMatrix.scale(scale);
+
+    // Calculate matrices
+    QMatrix4x4 mvpMatrix = m_projectionMatrix * m_viewMatrix * markerMatrix;
+    QMatrix3x3 normalMatrix = markerMatrix.normalMatrix();
+
+    // Set uniforms
+    m_program->setUniformValue("mvpMatrix", mvpMatrix);
+    m_program->setUniformValue("modelMatrix", markerMatrix);
+    m_program->setUniformValue("normalMatrix", normalMatrix);
+    m_program->setUniformValue("lightPos", QVector3D(5.0f, 5.0f, 5.0f));
+    m_program->setUniformValue("viewPos", QVector3D(4.0f, 3.0f, 6.0f));
+    m_program->setUniformValue("color", color);
+    m_program->setUniformValue("alpha", 1.0f);
+
+    // Bind sphere geometry
+    m_sphereVertexBuffer->bind();
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+
+    m_sphereNormalBuffer->bind();
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+
+    // Render marker
+    m_sphereIndexBuffer->bind();
+    glDrawElements(GL_TRIANGLES, m_sphereIndices.size(), GL_UNSIGNED_INT, 0);
+
+    // Cleanup
+    glDisableVertexAttribArray(0);
+    glDisableVertexAttribArray(1);
+    m_sphereIndexBuffer->release();
+    m_sphereNormalBuffer->release();
+    m_sphereVertexBuffer->release();
+    m_program->release();
+}
+
+void OpenGL3DRenderer::renderVertexLabels() {
+    if (!m_showVertexLabels)
+        return;
+
+    // Get vertices for current shape
+    QVector<QVector3D> baseVertices;
+
+    switch (m_currentShape) {
+        case 1:  // Cube - 8 corners
+            baseVertices = {QVector3D(-1.0f, -1.0f, -1.0f), QVector3D(1.0f, -1.0f, -1.0f),
+                            QVector3D(1.0f, 1.0f, -1.0f),   QVector3D(-1.0f, 1.0f, -1.0f),
+                            QVector3D(-1.0f, -1.0f, 1.0f),  QVector3D(1.0f, -1.0f, 1.0f),
+                            QVector3D(1.0f, 1.0f, 1.0f),    QVector3D(-1.0f, 1.0f, 1.0f)};
+            break;
+
+        case 4:  // Tetrahedron - 4 corners
+        default:
+            baseVertices = {
+                QVector3D(0.0f, 1.2f, 0.0f),    // apex
+                QVector3D(-1.0f, -0.4f, 1.0f),  // base front-left
+                QVector3D(1.0f, -0.4f, 1.0f),   // base front-right
+                QVector3D(0.0f, -0.4f, -1.4f)   // base back
+            };
+            break;
+    }
+
+    // Render reference model vertex markers (white with prime numbers)
+    if (m_showReferenceModel) {
+        QMatrix4x4 referenceMatrix;
+        referenceMatrix.rotate(QQuaternion::fromEulerAngles(15.0f, 25.0f, 0.0f));
+
+        for (int i = 0; i < baseVertices.size(); ++i) {
+            QVector3D refPos = (referenceMatrix * QVector4D(baseVertices[i], 1.0f)).toVector3D();
+            QVector3D whiteColor(1.0f, 1.0f, 1.0f);         // White for reference (1', 2', 3', 4')
+            renderVertexMarker(refPos, whiteColor, 0.08f);  // Slightly larger
+        }
+    }
+
+    // Render movable model vertex markers (colored by shape)
+    if (m_showMovableModel) {
+        QMatrix4x4 movableMatrix;
+        movableMatrix.translate(m_translation);
+        movableMatrix.rotate(m_rotation);
+        movableMatrix.scale(m_scale);
+
+        QVector3D markerColor;
+        switch (m_currentShape) {
+            case 1:
+                markerColor = QVector3D(1.0f, 0.0f, 0.0f);
+                break;  // Red for cube
+            case 2:
+                markerColor = QVector3D(0.0f, 0.0f, 1.0f);
+                break;  // Blue for sphere
+            case 3:
+                markerColor = QVector3D(0.0f, 1.0f, 0.0f);
+                break;  // Green for torus
+            case 4:
+                markerColor = QVector3D(1.0f, 0.0f, 1.0f);
+                break;  // Magenta for tetrahedron
+            default:
+                markerColor = QVector3D(0.8f, 0.8f, 0.8f);
+                break;
+        }
+
+        for (int i = 0; i < baseVertices.size(); ++i) {
+            QVector3D movPos = (movableMatrix * QVector4D(baseVertices[i], 1.0f)).toVector3D();
+            renderVertexMarker(movPos, markerColor, 0.06f);  // Smaller for movable (1, 2, 3, 4)
+        }
+    }
+}
+
+void OpenGL3DRenderer::renderShape() {
+    // This method is kept for compatibility but dual model rendering
+    // is now handled by renderReferenceModel() and renderMovableModel()
+    renderMovableModel();
 }
 
 void OpenGL3DRenderer::generateGeometry() {
@@ -517,44 +816,188 @@ void OpenGL3DRenderer::updateBuffers() {
 // OpenGL3DViewport Implementation
 OpenGL3DViewport::OpenGL3DViewport(QQuickItem* parent)
     : QQuickFramebufferObject(parent),
-      m_currentShape(4)  // Default to tetrahedron
-      ,
-      m_translation(0.0f, 0.0f, 0.0f)  // Start at origin
-      ,
-      m_rotation(15.0f, 25.0f, 0.0f)  // Initial 3D rotation
-      ,
+      m_currentShape(4),                // Default to tetrahedron
+      m_translation(0.0f, 0.0f, 0.0f),  // Start at origin
+      m_rotation(15.0f, 25.0f, 0.0f),   // Initial 3D rotation
       m_scale(1.0f),
-      m_mousePressed(false),            // NEW: Initialize mouse state
-      m_activeButton(Qt::NoButton),     // NEW
-      m_rotationSensitivity(0.5f),      // NEW: Sensitivity settings
-      m_translationSensitivity(0.01f),  // NEW
-      m_scaleSensitivity(0.1f)          // NEW
+      m_mousePressed(false),
+      m_activeButton(Qt::NoButton),
+      m_rotationSensitivity(0.5f),
+      m_translationSensitivity(0.01f),
+      m_scaleSensitivity(0.1f),
+      m_showReferenceModel(true),  // NEW
+      m_showMovableModel(true),    // NEW
+      m_showVertexLabels(true),    // NEW
+      m_alignmentAccuracy(0.0f),   // NEW
+      m_taskActive(false)          // NEW
 {
     setMirrorVertically(true);
 
-    // NEW: Enable mouse tracking and accept mouse events
+    // Enable mouse tracking and accept mouse events
     setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton | Qt::MiddleButton);
     setAcceptHoverEvents(true);
-    setFlag(QQuickItem::ItemAcceptsInputMethod, true);  // NEW
-    setFlag(QQuickItem::ItemIsFocusScope, true);        // NEW
-    setFocus(true);                                     // NEW
+    setFlag(QQuickItem::ItemAcceptsInputMethod, true);
+    setFlag(QQuickItem::ItemIsFocusScope, true);
+    setFocus(true);
 
     // Setup animation timer
     m_animationTimer = new QTimer(this);
     connect(m_animationTimer, &QTimer::timeout, this, &OpenGL3DViewport::updateAnimation);
     m_animationTimer->start(33);  // 30 FPS
+
+    // Connect transform changes to alignment calculation
+    connect(this, &OpenGL3DViewport::transformChanged, this,
+            &OpenGL3DViewport::calculateAlignmentAccuracy);
 }
 
-// NEW: Mouse interaction methods implementation
+// Research-specific setter implementations
+void OpenGL3DViewport::setShowReferenceModel(bool show) {
+    if (m_showReferenceModel != show) {
+        m_showReferenceModel = show;
+        emit displayChanged();
+        update();
+    }
+}
 
+void OpenGL3DViewport::setShowMovableModel(bool show) {
+    if (m_showMovableModel != show) {
+        m_showMovableModel = show;
+        emit displayChanged();
+        update();
+    }
+}
+
+void OpenGL3DViewport::setShowVertexLabels(bool show) {
+    if (m_showVertexLabels != show) {
+        m_showVertexLabels = show;
+        emit displayChanged();
+        update();
+    }
+}
+
+// Calculate alignment accuracy for research metrics
+void OpenGL3DViewport::calculateAlignmentAccuracy() {
+    if (!m_taskActive)
+        return;
+
+    // Calculate RMS distance between corresponding vertices
+    float totalDistance = 0.0f;
+    int vertexCount = 0;
+
+    // Get base vertices for current shape
+    QVector<QVector3D> baseVertices;
+    switch (m_currentShape) {
+        case 1:  // Cube
+            baseVertices = {QVector3D(-1.0f, -1.0f, -1.0f), QVector3D(1.0f, -1.0f, -1.0f),
+                            QVector3D(1.0f, 1.0f, -1.0f),   QVector3D(-1.0f, 1.0f, -1.0f),
+                            QVector3D(-1.0f, -1.0f, 1.0f),  QVector3D(1.0f, -1.0f, 1.0f),
+                            QVector3D(1.0f, 1.0f, 1.0f),    QVector3D(-1.0f, 1.0f, 1.0f)};
+            break;
+        case 4:  // Tetrahedron
+        default:
+            baseVertices = {
+                QVector3D(0.0f, 1.2f, 0.0f),    // apex
+                QVector3D(-1.0f, -0.4f, 1.0f),  // base front-left
+                QVector3D(1.0f, -0.4f, 1.0f),   // base front-right
+                QVector3D(0.0f, -0.4f, -1.4f)   // base back
+            };
+            break;
+    }
+
+    // Transform vertices
+    QMatrix4x4 referenceMatrix;
+    referenceMatrix.rotate(QQuaternion::fromEulerAngles(15.0f, 25.0f, 0.0f));
+
+    QMatrix4x4 movableMatrix;
+    movableMatrix.translate(m_translation);
+    movableMatrix.rotate(
+        QQuaternion::fromEulerAngles(m_rotation.x(), m_rotation.y(), m_rotation.z()));
+    movableMatrix.scale(m_scale);
+
+    for (const QVector3D& vertex : baseVertices) {
+        QVector3D refPos = (referenceMatrix * QVector4D(vertex, 1.0f)).toVector3D();
+        QVector3D movPos = (movableMatrix * QVector4D(vertex, 1.0f)).toVector3D();
+
+        float distance = (refPos - movPos).length();
+        totalDistance += distance * distance;
+        vertexCount++;
+    }
+
+    float newAccuracy = vertexCount > 0 ? sqrt(totalDistance / vertexCount) : 100.0f;
+
+    if (qAbs(m_alignmentAccuracy - newAccuracy) > 0.001f) {
+        m_alignmentAccuracy = newAccuracy;
+        emit alignmentChanged();
+
+        // Check if alignment is very good (research threshold)
+        if (m_alignmentAccuracy < 0.1f && m_taskActive) {
+            // Task completed!
+            qint64 elapsedTime = m_taskStartTime.elapsed();
+            emit alignmentCompleted(m_alignmentAccuracy, static_cast<int>(elapsedTime));
+            m_taskActive = false;
+            emit taskStateChanged();
+        }
+    }
+}
+
+// Start a research task
+void OpenGL3DViewport::startAlignmentTask() {
+    m_taskStartTime.start();
+    m_taskActive = true;
+    emit taskStateChanged();
+
+    // Randomize initial position for research consistency using modern random
+    QRandomGenerator* rng = QRandomGenerator::global();
+
+    float randX = (rng->bounded(400) - 200) / 100.0f;  // -2.0 to 2.0
+    float randY = (rng->bounded(400) - 200) / 100.0f;
+    float randZ = (rng->bounded(400) - 200) / 100.0f;
+
+    float randRotX = rng->bounded(360);
+    float randRotY = rng->bounded(360);
+    float randRotZ = rng->bounded(360);
+
+    float randScale = 0.5f + (rng->bounded(200)) / 200.0f;  // 0.5 to 1.5
+
+    setTranslation(QVector3D(randX, randY, randZ));
+    setRotation(QVector3D(randRotX, randRotY, randRotZ));
+    setScale(randScale);
+
+    qDebug() << "Alignment task started - Target accuracy: < 0.1 units";
+    qDebug() << "Initial position:" << m_translation;
+    qDebug() << "Initial rotation:" << m_rotation;
+    qDebug() << "Initial scale:" << m_scale;
+}
+
+// Finish current task
+void OpenGL3DViewport::finishAlignmentTask() {
+    if (m_taskActive) {
+        qint64 elapsedTime = m_taskStartTime.elapsed();
+        emit alignmentCompleted(m_alignmentAccuracy, static_cast<int>(elapsedTime));
+        m_taskActive = false;
+        emit taskStateChanged();
+        qDebug() << "Task manually finished - Accuracy:" << m_alignmentAccuracy
+                 << "Time:" << elapsedTime << "ms";
+    }
+}
+
+// Cycle through interaction modes for research
+void OpenGL3DViewport::nextInteractionMode() {
+    // This will be used to switch between:
+    // 1. Traditional Mouse (current implementation)
+    // 2. SpaceMouse (6DOF) - to be implemented
+    // 3. Multi-touch trackpad - to be implemented
+
+    qDebug() << "Cycling to next interaction mode (placeholder for future implementation)";
+}
+
+// Mouse interaction methods implementation
 void OpenGL3DViewport::handleMousePress(QMouseEvent* event) {
     m_mousePressed = true;
     m_lastMousePos = event->pos();
     m_activeButton = event->button();
-    emit mousePressedChanged();  // NEW: Emit signal for QML
+    emit mousePressedChanged();
     qDebug() << "Mouse pressed:" << event->button() << "at" << event->pos();
-
-    // Accept the event to enable mouse tracking
     event->accept();
 }
 
@@ -598,7 +1041,7 @@ void OpenGL3DViewport::handleMouseMove(QMouseEvent* event) {
 void OpenGL3DViewport::handleMouseRelease(QMouseEvent* event) {
     m_mousePressed = false;
     m_activeButton = Qt::NoButton;
-    emit mousePressedChanged();  // NEW: Emit signal for QML
+    emit mousePressedChanged();
     qDebug() << "Mouse released:" << event->button();
     event->accept();
 }
@@ -629,8 +1072,7 @@ void OpenGL3DViewport::handleWheelEvent(QWheelEvent* event) {
     event->accept();
 }
 
-// NEW: Helper methods for applying transformations
-
+// Helper methods for applying transformations
 void OpenGL3DViewport::applyRotationDelta(const QPoint& delta) {
     // Convert mouse movement to rotation
     float deltaX = delta.x() * m_rotationSensitivity;
@@ -673,7 +1115,7 @@ void OpenGL3DViewport::applyScaleDelta(const QPoint& delta) {
     setScale(newScale);
 }
 
-// NEW: Override mouse event handlers in QQuickItem
+// Override mouse event handlers in QQuickItem
 void OpenGL3DViewport::mousePressEvent(QMouseEvent* event) {
     handleMousePress(event);
 }
@@ -737,7 +1179,7 @@ void OpenGL3DViewport::resetTransform() {
 void OpenGL3DViewport::updateAnimation() {
     update();  // Trigger re-render
 }
-// NEW: Keyboard event handler
+
 // Enhanced keyboard event handler with better feedback
 void OpenGL3DViewport::keyPressEvent(QKeyEvent* event) {
     const float step = 0.1f;       // Translation step
@@ -885,7 +1327,7 @@ void OpenGL3DViewport::focusInEvent(QFocusEvent* event) {
     QQuickFramebufferObject::focusInEvent(event);
 }
 
-// NEW: Add sensitivity adjustment methods
+// Add sensitivity adjustment methods
 void OpenGL3DViewport::setRotationSensitivity(float sensitivity) {
     m_rotationSensitivity = qBound(0.1f, sensitivity, 2.0f);
 }
@@ -902,5 +1344,3 @@ void OpenGL3DViewport::setTranslationSensitivity(float sensitivity) {
 void OpenGL3DViewport::setScaleSensitivity(float sensitivity) {
     m_scaleSensitivity = qBound(0.01f, sensitivity, 1.0f);
 }
-
-// REMOVED: #include "OpenGL3DViewport.moc" - This was causing the MOC warning

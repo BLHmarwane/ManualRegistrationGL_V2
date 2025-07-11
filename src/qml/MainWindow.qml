@@ -34,9 +34,9 @@ Rectangle {
 
                     Text {
                         anchors.centerIn: parent
-                        text: "SURGAR V2"
+                        text: "SURGAR V2 Research"
                         color: "#FFFFFF"
-                        font.pixelSize: 16
+                        font.pixelSize: 14
                         font.bold: true
                         font.family: "Arial"
                     }
@@ -72,7 +72,7 @@ Rectangle {
 
                             Text {
                                 anchors.centerIn: parent
-                                text: "Ground Truth Mode"
+                                text: "Dual Model Alignment"
                                 color: "#FFFFFF"
                                 font.pixelSize: 12
                                 font.family: "Arial"
@@ -80,7 +80,7 @@ Rectangle {
 
                             MouseArea {
                                 anchors.fill: parent
-                                onClicked: console.log("Ground Truth mode selected")
+                                onClicked: console.log("Dual model mode selected")
                             }
                         }
 
@@ -153,13 +153,15 @@ Rectangle {
                         Rectangle {
                             width: parent.width
                             height: 32
-                            color: "#4A90E2"
+                            color: "#F8F9FA"
                             radius: 6
+                            border.color: "#4A90E2"
+                            border.width: 1
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "SpaceMouse (6DOF)"
-                                color: "#FFFFFF"
+                                color: "#2E3440"
                                 font.pixelSize: 12
                                 font.family: "Arial"
                             }
@@ -195,15 +197,13 @@ Rectangle {
                        Rectangle {
                            width: parent.width
                            height: 32
-                           color: "#F8F9FA"
+                           color: "#4A90E2"
                            radius: 6
-                           border.color: "#757575"
-                           border.width: 1
 
                            Text {
                                anchors.centerIn: parent
                                text: "Mouse (Traditional)"
-                               color: "#2E3440"
+                               color: "#FFFFFF"
                                font.pixelSize: 12
                                font.family: "Arial"
                            }
@@ -342,7 +342,7 @@ Rectangle {
            }
        }
 
-       // Main 3D Viewport (50% width) - REAL OPENGL RENDERER!
+       // Main 3D Viewport (50% width) - DUAL MODEL RENDERER!
        Rectangle {
            width: parent.width * 0.5
            height: parent.height
@@ -356,11 +356,16 @@ Rectangle {
                anchors.fill: parent
                anchors.margins: 4
 
-               // FIXED: Better initial values for 3D viewing
+               // Initial values for 3D viewing
                currentShape: 4  // Tetrahedron
-               translation: Qt.vector3d(0.0, 0.0, 0.0)      // Center at origin
-               rotation: Qt.vector3d(15.0, 25.0, 0.0)       // Good 3D viewing angle
+               translation: Qt.vector3d(0.0, 0.0, 0.0)
+               rotation: Qt.vector3d(15.0, 25.0, 0.0)
                scale: 1.0
+
+               // Research display settings
+               showReferenceModel: true
+               showMovableModel: true
+               showVertexLabels: true
 
                // Connect transform changes to update display
                onTransformChanged: {
@@ -370,37 +375,224 @@ Rectangle {
                }
            }
 
+           // Task Instructions Overlay
+           Rectangle {
+               anchors.top: parent.top
+               anchors.left: parent.left
+               anchors.margins: 16
+               width: 300
+               height: taskInstructions.visible ? 140 : 0
+               color: "#000000"
+               opacity: 0.85
+               radius: 8
+               visible: true
+
+               Column {
+                   id: taskInstructions
+                   anchors.fill: parent
+                   anchors.margins: 12
+                   spacing: 6
+                   visible: parent.visible
+
+                   Text {
+                       text: "🎯 Alignment Task"
+                       color: "#FFFFFF"
+                       font.pixelSize: 14
+                       font.bold: true
+                       font.family: "Arial"
+                   }
+
+                   Text {
+                       text: "Objective: Align numbered corners"
+                       color: "#4A90E2"
+                       font.pixelSize: 12
+                       font.family: "Arial"
+                   }
+
+                   Text {
+                       text: "• White spheres = Reference (1', 2', 3'...)"
+                       color: "#CCCCCC"
+                       font.pixelSize: 10
+                       font.family: "Arial"
+                   }
+
+                   Text {
+                       text: "• Colored spheres = Movable (1, 2, 3...)"
+                       color: "#CCCCCC"
+                       font.pixelSize: 10
+                       font.family: "Arial"
+                   }
+
+                   Text {
+                       text: "• Match: 1→1', 2→2', 3→3', etc."
+                       color: "#CCCCCC"
+                       font.pixelSize: 10
+                       font.family: "Arial"
+                   }
+
+                   Text {
+                       text: "Target: < 0.100 units accuracy"
+                       color: "#4CAF50"
+                       font.pixelSize: 10
+                       font.bold: true
+                       font.family: "Arial"
+                   }
+               }
+
+               // Close button
+               Rectangle {
+                   anchors.top: parent.top
+                   anchors.right: parent.right
+                   anchors.margins: 8
+                   width: 20
+                   height: 20
+                   color: "#FF5722"
+                   radius: 10
+
+                   Text {
+                       anchors.centerIn: parent
+                       text: "×"
+                       color: "#FFFFFF"
+                       font.pixelSize: 12
+                       font.bold: true
+                   }
+
+                   MouseArea {
+                       anchors.fill: parent
+                       onClicked: parent.parent.visible = false
+                   }
+               }
+           }
+
+           // Task Completion Overlay
+           Rectangle {
+               id: completionOverlay
+               anchors.centerIn: parent
+               width: 350
+               height: 200
+               color: "#4CAF50"
+               opacity: 0.95
+               radius: 12
+               visible: false
+
+               Column {
+                   anchors.centerIn: parent
+                   spacing: 12
+
+                   Text {
+                       text: "🎉 Task Completed!"
+                       color: "#FFFFFF"
+                       font.pixelSize: 20
+                       font.bold: true
+                       font.family: "Arial"
+                       anchors.horizontalCenter: parent.horizontalCenter
+                   }
+
+                   Text {
+                       id: completionAccuracy
+                       text: "Accuracy: 0.045 units"
+                       color: "#FFFFFF"
+                       font.pixelSize: 14
+                       font.family: "Consolas, Monaco, monospace"
+                       anchors.horizontalCenter: parent.horizontalCenter
+                   }
+
+                   Text {
+                       id: completionTime
+                       text: "Time: 23.4 seconds"
+                       color: "#FFFFFF"
+                       font.pixelSize: 14
+                       font.family: "Consolas, Monaco, monospace"
+                       anchors.horizontalCenter: parent.horizontalCenter
+                   }
+
+                   Rectangle {
+                       width: 120
+                       height: 35
+                       color: "#FFFFFF"
+                       radius: 6
+                       anchors.horizontalCenter: parent.horizontalCenter
+
+                       Text {
+                           anchors.centerIn: parent
+                           text: "Next Task"
+                           color: "#4CAF50"
+                           font.pixelSize: 12
+                           font.bold: true
+                           font.family: "Arial"
+                       }
+
+                       MouseArea {
+                           anchors.fill: parent
+                           onClicked: {
+                               completionOverlay.visible = false
+                               viewport3D.startAlignmentTask()
+                           }
+                       }
+                   }
+               }
+           }
+
+           // Performance Metrics Display (bottom right)
+           Rectangle {
+               anchors.bottom: parent.bottom
+               anchors.right: parent.right
+               anchors.margins: 16
+               width: 200
+               height: 80
+               color: "#000000"
+               opacity: 0.7
+               radius: 6
+
+               Column {
+                   anchors.centerIn: parent
+                   spacing: 4
+
+                   Text {
+                       text: "Real-time Metrics"
+                       color: "#FFFFFF"
+                       font.pixelSize: 11
+                       font.bold: true
+                       font.family: "Arial"
+                       anchors.horizontalCenter: parent.horizontalCenter
+                   }
+
+                   Text {
+                       text: "Accuracy: " + viewport3D.alignmentAccuracy.toFixed(3)
+                       color: viewport3D.alignmentAccuracy < 0.1 ? "#4CAF50" : "#FF9800"
+                       font.pixelSize: 10
+                       font.family: "Consolas, Monaco, monospace"
+                       anchors.horizontalCenter: parent.horizontalCenter
+                   }
+
+                   Text {
+                       text: "Mode: Traditional Mouse"
+                       color: "#4A90E2"
+                       font.pixelSize: 10
+                       font.family: "Arial"
+                       anchors.horizontalCenter: parent.horizontalCenter
+                   }
+
+                   Text {
+                       text: viewport3D.mousePressed ? "Transforming..." : "Ready"
+                       color: viewport3D.mousePressed ? "#FF9800" : "#CCCCCC"
+                       font.pixelSize: 10
+                       font.family: "Arial"
+                       anchors.horizontalCenter: parent.horizontalCenter
+                   }
+               }
+           }
+
            // 3D Viewport Label
            Text {
                anchors.top: parent.top
                anchors.left: parent.left
                anchors.margins: 12
-               text: "3D Viewport - OpenGL Renderer"
+               text: "Dual Model 3D Viewport"
                color: "#4A90E2"
                font.pixelSize: 14
                font.bold: true
                font.family: "Arial"
-           }
-
-           // Status overlay
-           Rectangle {
-               anchors.bottom: parent.bottom
-               anchors.right: parent.right
-               anchors.margins: 20
-               width: 120
-               height: 32
-               color: "#4A90E2"
-               radius: 16
-               opacity: 0.9
-
-               Text {
-                   anchors.centerIn: parent
-                   text: "OpenGL Active"
-                   color: "#FFFFFF"
-                   font.pixelSize: 11
-                   font.bold: true
-                   font.family: "Arial"
-               }
            }
        }
 
@@ -417,12 +609,10 @@ Rectangle {
                anchors.margins: 20
                spacing: 20
 
-               // Also update the session control buttons:
-
-// Session Controls Section
+               // Research Task Controls Section
                Rectangle {
                    width: parent.width
-                   height: 180  // Increased height to fit all 3 buttons
+                   height: 220
                    color: "#FFFFFF"
                    border.color: "#E1E5E9"
                    border.width: 1
@@ -434,90 +624,276 @@ Rectangle {
                        spacing: 12
 
                        Text {
-                           text: "Session Control"
+                           text: "Research Task Control"
                            color: "#2E3440"
                            font.pixelSize: 14
                            font.bold: true
                            font.family: "Arial"
                        }
 
-                       Rectangle {
+                       // Interaction Mode Selection
+                       Column {
                            width: parent.width
-                           height: 38
-                           color: "#4CAF50"
-                           radius: 6
+                           spacing: 6
 
                            Text {
-                               anchors.centerIn: parent
-                               text: "Start Session"
+                               text: "Current Mode:"
                                font.pixelSize: 12
                                font.bold: true
-                               color: "#FFFFFF"
+                               color: "#4A90E2"
                                font.family: "Arial"
                            }
 
-                           MouseArea {
-                               anchors.fill: parent
-                               onClicked: {
-                                   console.log("Start session clicked")
-                                   // Apply better demo transform for 3D viewing
-                                   viewport3D.translation = Qt.vector3d(0.5, -0.3, 0.2)
-                                   viewport3D.rotation = Qt.vector3d(45.0, 60.0, 15.0)
-                                   viewport3D.scale = 1.2
+                           Rectangle {
+                               width: parent.width
+                               height: 32
+                               color: "#E8F4FD"
+                               radius: 6
+                               border.color: "#4A90E2"
+                               border.width: 1
+
+                               Text {
+                                   anchors.centerIn: parent
+                                   text: "Traditional Mouse (2D)"
+                                   font.pixelSize: 11
+                                   color: "#2E3440"
+                                   font.family: "Arial"
                                }
                            }
                        }
 
-                       Rectangle {
+                       // Task Control Buttons
+                       Row {
                            width: parent.width
-                           height: 38
-                           color: "#FF9800"
-                           radius: 6
+                           spacing: 8
 
-                           Text {
-                               anchors.centerIn: parent
-                               text: "Reset Transform"
-                               font.pixelSize: 12
-                               color: "#FFFFFF"
-                               font.family: "Arial"
+                           Rectangle {
+                               width: (parent.width - 8) / 2
+                               height: 38
+                               color: "#4CAF50"
+                               radius: 6
+
+                               Text {
+                                   anchors.centerIn: parent
+                                   text: "Start Task"
+                                   font.pixelSize: 11
+                                   font.bold: true
+                                   color: "#FFFFFF"
+                                   font.family: "Arial"
+                               }
+
+                               MouseArea {
+                                   anchors.fill: parent
+                                   onClicked: {
+                                       console.log("Research task started")
+                                       viewport3D.startAlignmentTask()
+                                   }
+                               }
                            }
 
-                           MouseArea {
-                               anchors.fill: parent
-                               onClicked: {
-                                   console.log("Reset clicked")
-                                   viewport3D.resetTransform()
+                           Rectangle {
+                               width: (parent.width - 8) / 2
+                               height: 38
+                               color: "#F44336"
+                               radius: 6
+
+                               Text {
+                                   anchors.centerIn: parent
+                                   text: "Reset"
+                                   font.pixelSize: 11
+                                   font.bold: true
+                                   color: "#FFFFFF"
+                                   font.family: "Arial"
+                               }
+
+                               MouseArea {
+                                   anchors.fill: parent
+                                   onClicked: {
+                                       console.log("Task reset")
+                                       viewport3D.resetTransform()
+                                   }
                                }
                            }
                        }
 
-                       // FIXED: ADD BACK THE FINISH SESSION BUTTON!
+                       // Alignment Accuracy Display
                        Rectangle {
                            width: parent.width
-                           height: 38
-                           color: "#F44336"
+                           height: 45
+                           color: "#F8F9FA"
                            radius: 6
+                           border.color: "#E1E5E9"
+                           border.width: 1
 
-                           Text {
+                           Column {
                                anchors.centerIn: parent
-                               text: "Finish Session"
-                               font.pixelSize: 12
-                               font.bold: true
-                               color: "#FFFFFF"
-                               font.family: "Arial"
-                           }
+                               spacing: 2
 
-                           MouseArea {
-                               anchors.fill: parent
-                               onClicked: {
-                                   console.log("Finish session clicked")
-                                   // Reset to initial state
-                                   viewport3D.resetTransform()
+                               Text {
+                                   text: "Alignment Accuracy"
+                                   font.pixelSize: 10
+                                   color: "#666666"
+                                   font.family: "Arial"
+                                   anchors.horizontalCenter: parent.horizontalCenter
+                               }
+
+                               Text {
+                                   text: viewport3D.alignmentAccuracy.toFixed(3) + " units"
+                                   font.pixelSize: 14
+                                   font.bold: true
+                                   color: viewport3D.alignmentAccuracy < 0.1 ? "#4CAF50" : "#FF9800"
+                                   font.family: "Consolas, Monaco, monospace"
+                                   anchors.horizontalCenter: parent.horizontalCenter
                                }
                            }
                        }
                    }
                }
+
+               // Display Controls Section
+               Rectangle {
+                   width: parent.width
+                   height: 200
+                   color: "#FFFFFF"
+                   border.color: "#E1E5E9"
+                   border.width: 1
+                   radius: 8
+
+                   Column {
+                       anchors.fill: parent
+                       anchors.margins: 16
+                       spacing: 12
+
+                       Text {
+                           text: "Display Options"
+                           color: "#2E3440"
+                           font.pixelSize: 14
+                           font.bold: true
+                           font.family: "Arial"
+                       }
+
+                       // Reference Model Toggle
+                       Rectangle {
+                           width: parent.width
+                           height: 35
+                           color: viewport3D.showReferenceModel ? "#4A90E2" : "#F8F9FA"
+                           radius: 6
+                           border.color: "#4A90E2"
+                           border.width: 1
+
+                           Row {
+                               anchors.left: parent.left
+                               anchors.leftMargin: 12
+                               anchors.verticalCenter: parent.verticalCenter
+                               spacing: 8
+
+                               Rectangle {
+                                   width: 12
+                                   height: 12
+                                   radius: 6
+                                   color: viewport3D.showReferenceModel ? "#FFFFFF" : "transparent"
+                                   border.color: "#4A90E2"
+                                   border.width: 1
+                                   anchors.verticalCenter: parent.verticalCenter
+                               }
+
+                               Text {
+                                   text: "Show Reference Model (1', 2', 3'...)"
+                                   color: viewport3D.showReferenceModel ? "#FFFFFF" : "#2E3440"
+                                   font.pixelSize: 11
+                                   font.family: "Arial"
+                                   anchors.verticalCenter: parent.verticalCenter
+                               }
+                           }
+
+                           MouseArea {
+                               anchors.fill: parent
+                               onClicked: viewport3D.showReferenceModel = !viewport3D.showReferenceModel
+                           }
+                       }
+
+                       // Movable Model Toggle
+                       Rectangle {
+                           width: parent.width
+                           height: 35
+                           color: viewport3D.showMovableModel ? "#4A90E2" : "#F8F9FA"
+                           radius: 6
+                           border.color: "#4A90E2"
+                           border.width: 1
+
+                           Row {
+                               anchors.left: parent.left
+                               anchors.leftMargin: 12
+                               anchors.verticalCenter: parent.verticalCenter
+                               spacing: 8
+
+                               Rectangle {
+                                   width: 12
+                                   height: 12
+                                   radius: 6
+                                   color: viewport3D.showMovableModel ? "#FFFFFF" : "transparent"
+                                   border.color: "#4A90E2"
+                                   border.width: 1
+                                   anchors.verticalCenter: parent.verticalCenter
+                               }
+
+                               Text {
+                                   text: "Show Movable Model (1, 2, 3...)"
+                                   color: viewport3D.showMovableModel ? "#FFFFFF" : "#2E3440"
+                                   font.pixelSize: 11
+                                   font.family: "Arial"
+                                   anchors.verticalCenter: parent.verticalCenter
+                               }
+                           }
+
+                           MouseArea {
+                               anchors.fill: parent
+                               onClicked: viewport3D.showMovableModel = !viewport3D.showMovableModel
+                           }
+                       }
+
+                       // Vertex Labels Toggle
+                       Rectangle {
+                           width: parent.width
+                           height: 35
+                           color: viewport3D.showVertexLabels ? "#4A90E2" : "#F8F9FA"
+                           radius: 6
+                           border.color: "#4A90E2"
+                           border.width: 1
+
+                           Row {
+                               anchors.left: parent.left
+                               anchors.leftMargin: 12
+                               anchors.verticalCenter: parent.verticalCenter
+                               spacing: 8
+
+                               Rectangle {
+                                   width: 12
+                                   height: 12
+                                   radius: 6
+                                   color: viewport3D.showVertexLabels ? "#FFFFFF" : "transparent"
+                                   border.color: "#4A90E2"
+                                   border.width: 1
+                                   anchors.verticalCenter: parent.verticalCenter
+                               }
+
+                               Text {
+                                   text: "Show Vertex Markers"
+                                   color: viewport3D.showVertexLabels ? "#FFFFFF" : "#2E3440"
+                                   font.pixelSize: 11
+                                   font.family: "Arial"
+                                   anchors.verticalCenter: parent.verticalCenter
+                               }
+                           }
+
+                           MouseArea {
+                               anchors.fill: parent
+                               onClicked: viewport3D.showVertexLabels = !viewport3D.showVertexLabels
+                           }
+                       }
+                   }
+               }
+
                // Transform Display Section - REAL-TIME VALUES!
                Rectangle {
                    id: transformDisplay
@@ -679,7 +1055,7 @@ Rectangle {
                        spacing: 4
 
                        Text {
-                           text: "OpenGL Renderer"
+                           text: "Dual Model Renderer"
                            font.pixelSize: 12
                            font.bold: true
                            color: "#2E3440"
@@ -688,15 +1064,27 @@ Rectangle {
                        }
 
                        Text {
-                           text: "Active"
+                           text: viewport3D.taskActive ? "Task Active" : "Ready"
                            font.pixelSize: 10
-                           color: "#4A90E2"
+                           color: viewport3D.taskActive ? "#4CAF50" : "#4A90E2"
                            font.family: "Arial"
                            anchors.horizontalCenter: parent.horizontalCenter
                        }
                    }
                }
            }
+       }
+   }
+
+   // Research task event connections
+   Connections {
+       target: viewport3D
+
+       function onAlignmentCompleted(accuracy, timeMs) {
+           console.log("Task completed! Accuracy:", accuracy, "Time:", timeMs, "ms")
+           completionAccuracy.text = "Accuracy: " + accuracy.toFixed(3) + " units"
+           completionTime.text = "Time: " + (timeMs / 1000.0).toFixed(1) + " seconds"
+           completionOverlay.visible = true
        }
    }
 }

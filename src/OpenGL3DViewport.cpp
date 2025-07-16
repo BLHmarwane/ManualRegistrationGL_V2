@@ -1498,11 +1498,16 @@ void OpenGL3DViewport::handleSpaceMouseTranslation(const QVector3D& translation)
         qDebug() << "SpaceMouse input ignored - not enabled or wrong mode";
         return;
     }
+    // Debug: Show the raw input values
+    qDebug() << "Raw SpaceMouse translation input:" << translation;
 
     m_spaceMouseTranslationInput = translation;
     emit spaceMouseInputChanged();
 
-    QVector3D scaledTranslation = translation * m_spaceMouseTranslationSensitivity;
+    QVector3D scaledTranslation = translation * (m_spaceMouseTranslationSensitivity * 100000.0f);
+    // Debug: Show scaled values
+    qDebug() << "Scaled translation:" << scaledTranslation;
+
     QVector3D newTranslation = m_translation + scaledTranslation;
 
     newTranslation.setX(qBound(-10.0f, newTranslation.x(), 10.0f));
@@ -1516,11 +1521,16 @@ void OpenGL3DViewport::handleSpaceMouseRotation(const QVector3D& rotation) {
     if (!m_spaceMouseEnabled || m_interactionMode != "SpaceMouse") {
         return;
     }
+    // Debug: Show the raw input values
+    qDebug() << "Raw SpaceMouse rotation input:" << rotation;
 
     m_spaceMouseRotationInput = rotation;
     emit spaceMouseInputChanged();
 
-    QVector3D scaledRotation = rotation * m_spaceMouseRotationSensitivity;
+    QVector3D scaledRotation = rotation * (m_spaceMouseRotationSensitivity * 100000.0f);
+    // Debug: Show scaled values
+    qDebug() << "Scaled rotation:" << scaledRotation;
+
     QVector3D newRotation = m_rotation + scaledRotation;
 
     // Normalize angles
@@ -1570,12 +1580,12 @@ void OpenGL3DViewport::onSpaceMouseConnectionChanged(bool connected) {
 }
 
 void OpenGL3DViewport::setSpaceMouseTranslationSensitivity(float sensitivity) {
-    float newSensitivity = qBound(0.001f, sensitivity, 0.1f);
-    if (qAbs(m_spaceMouseTranslationSensitivity - newSensitivity) > 0.0001f) {
+    float newSensitivity = qBound(0.1f, sensitivity, 10.0f);
+    if (qAbs(m_spaceMouseTranslationSensitivity - newSensitivity) > 0.01f) {
         m_spaceMouseTranslationSensitivity = newSensitivity;
 
         if (m_spaceMouseManager) {
-            m_spaceMouseManager->setTranslationSensitivity(newSensitivity * 50.0f);
+            m_spaceMouseManager->setTranslationSensitivity(newSensitivity);  // *50.0f
         }
 
         emit spaceMouseSensitivityChanged();
@@ -1584,7 +1594,7 @@ void OpenGL3DViewport::setSpaceMouseTranslationSensitivity(float sensitivity) {
 }
 
 void OpenGL3DViewport::setSpaceMouseRotationSensitivity(float sensitivity) {
-    float newSensitivity = qBound(0.1f, sensitivity, 3.0f);
+    float newSensitivity = qBound(0.1f, sensitivity, 10.0f);
     if (qAbs(m_spaceMouseRotationSensitivity - newSensitivity) > 0.01f) {
         m_spaceMouseRotationSensitivity = newSensitivity;
 

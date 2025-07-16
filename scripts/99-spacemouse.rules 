@@ -1,0 +1,50 @@
+# udev rules for 3DConnexion SpaceMouse devices
+# Manual Registration Simulator V2 - SpaceMouse Support
+#
+# These rules provide proper permissions for SpaceMouse devices
+# Copy to /etc/udev/rules.d/ and reload udev rules
+
+# 3DConnexion SpaceMouse Pro
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c626", MODE="0666", GROUP="input", TAG+="uaccess"
+
+# 3DConnexion SpaceMouse Pro Wireless
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c627", MODE="0666", GROUP="input", TAG+="uaccess"
+
+# 3DConnexion SpaceMouse Pro Compact
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c62b", MODE="0666", GROUP="input", TAG+="uaccess"
+
+# 3DConnexion SpaceMouse Wireless (new vendor ID)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="256f", ATTRS{idProduct}=="c62e", MODE="0666", GROUP="input", TAG+="uaccess"
+
+# 3DConnexion SpaceMouse Pro Wireless (new vendor ID, USB)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="256f", ATTRS{idProduct}=="c62f", MODE="0666", GROUP="input", TAG+="uaccess"
+
+# 3DConnexion SpaceMouse Enterprise
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c628", MODE="0666", GROUP="input", TAG+="uaccess"
+
+# 3DConnexion SpaceMouse Compact
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c629", MODE="0666", GROUP="input", TAG+="uaccess"
+
+# 3DConnexion SpaceMouse Module
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c62a", MODE="0666", GROUP="input", TAG+="uaccess"
+
+# 3DConnexion SpaceMouse Enterprise (new vendor ID)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="256f", ATTRS{idProduct}=="c650", MODE="0666", GROUP="input", TAG+="uaccess"
+
+# 3DConnexion SpaceMouse Pro Compact (new vendor ID)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="256f", ATTRS{idProduct}=="c651", MODE="0666", GROUP="input", TAG+="uaccess"
+
+# 3DConnexion SpaceMouse Pro (new vendor ID)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="256f", ATTRS{idProduct}=="c652", MODE="0666", GROUP="input", TAG+="uaccess"
+
+# Older SpaceMouse models for compatibility
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c603", MODE="0666", GROUP="input", TAG+="uaccess"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c605", MODE="0666", GROUP="input", TAG+="uaccess"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c606", MODE="0666", GROUP="input", TAG+="uaccess"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c621", MODE="0666", GROUP="input", TAG+="uaccess"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c623", MODE="0666", GROUP="input", TAG+="uaccess"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c625", MODE="0666", GROUP="input", TAG+="uaccess"
+
+# Generic rule for any 3DConnexion device (fallback)
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="046d", MODE="0666", GROUP="input", TAG+="uaccess"
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="256f", MODE="0666", GROUP="input", TAG+="uaccess"

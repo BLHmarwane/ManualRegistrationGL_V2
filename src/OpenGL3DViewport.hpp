@@ -17,6 +17,9 @@
 #include <QVector3D>
 #include <QWheelEvent>
 
+// Forward declarations
+class SpaceMouseManager;
+
 class OpenGL3DRenderer : public QQuickFramebufferObject::Renderer, protected QOpenGLFunctions {
    public:
     OpenGL3DRenderer();
@@ -28,40 +31,44 @@ class OpenGL3DRenderer : public QQuickFramebufferObject::Renderer, protected QOp
 
    private:
     void initializeGL();
-    void renderShape();
     bool setupShaders();
-    void generateGeometry();
 
-    // Geometry generation methods for each shape
+    // Camera and rendering setup
+    void setupCameraMatrices();
+
+    // Dual model rendering methods
+    void renderReferenceModel();
+    void renderMovableModel();
+    void renderVertexLabels();
+
+    // Geometry rendering helpers
+    void bindAndRenderGeometry();
+    QVector3D getShapeColor(int shapeType) const;
+
+    // Vertex marker rendering
+    void renderVertexMarker(const QVector3D& position, const QVector3D& color, float scale = 0.05f);
+    QVector<QVector3D> getShapeVertices(int shapeType) const;
+
+    // Geometry generation methods
+    void generateGeometry();
     void generateCubeGeometry();
     void generateSphereGeometry();
     void generateTorusGeometry();
     void generateTetrahedronGeometry();
+    void generateSphereMarkerGeometry();
+    void createSphereBuffers();
     void updateBuffers();
 
-    // NEW: Dual model rendering methods
-    void renderReferenceModel();
-    void renderMovableModel();
-    void renderVertexLabels();
-    void calculateCornerVertices();
-
-    // NEW: Vertex marker rendering
-    void generateSphereMarkerGeometry();
-    void renderVertexMarker(const QVector3D& position, const QVector3D& color, float scale = 0.05f);
-
-    // NEW: Text rendering methods
-    void renderTextBackground(const QVector3D& position, float size, const QVector3D& color);
-    void renderVertexNumber(const QVector3D& position, int number, bool isPrime,
-                            float scale = 0.15f);
+    // Legacy compatibility
+    void renderShape();
 
     // OpenGL resources
     QOpenGLShaderProgram* m_program;
-    QOpenGLShaderProgram* m_textProgram;  // NEW: For text rendering
     QOpenGLBuffer* m_vertexBuffer;
     QOpenGLBuffer* m_indexBuffer;
     QOpenGLBuffer* m_normalBuffer;
 
-    // NEW: Sphere marker buffers
+    // Sphere marker buffers
     QOpenGLBuffer* m_sphereVertexBuffer;
     QOpenGLBuffer* m_sphereIndexBuffer;
     QOpenGLBuffer* m_sphereNormalBuffer;
@@ -71,7 +78,7 @@ class OpenGL3DRenderer : public QQuickFramebufferObject::Renderer, protected QOp
     QVector<float> m_normals;
     QVector<unsigned int> m_indices;
 
-    // NEW: Sphere marker data
+    // Sphere marker data
     QVector<float> m_sphereVertices;
     QVector<float> m_sphereNormals;
     QVector<unsigned int> m_sphereIndices;
@@ -87,14 +94,10 @@ class OpenGL3DRenderer : public QQuickFramebufferObject::Renderer, protected QOp
     QQuaternion m_rotation;
     float m_scale;
 
-    // NEW: Research display settings
+    // Research display settings
     bool m_showReferenceModel;
     bool m_showMovableModel;
     bool m_showVertexLabels;
-
-    // NEW: Vertex positions for labeling
-    QVector<QVector3D> m_referenceVertices;
-    QVector<QVector3D> m_movableVertices;
 
     // State
     bool m_initialized;
@@ -117,7 +120,7 @@ class OpenGL3DViewport : public QQuickFramebufferObject {
     Q_PROPERTY(float scaleSensitivity READ scaleSensitivity WRITE setScaleSensitivity NOTIFY
                    sensitivityChanged)
 
-    // NEW: Research-specific properties
+    // Research-specific properties
     Q_PROPERTY(bool showReferenceModel READ showReferenceModel WRITE setShowReferenceModel NOTIFY
                    displayChanged)
     Q_PROPERTY(
@@ -126,6 +129,21 @@ class OpenGL3DViewport : public QQuickFramebufferObject {
         bool showVertexLabels READ showVertexLabels WRITE setShowVertexLabels NOTIFY displayChanged)
     Q_PROPERTY(float alignmentAccuracy READ alignmentAccuracy NOTIFY alignmentChanged)
     Q_PROPERTY(bool taskActive READ taskActive NOTIFY taskStateChanged)
+
+    // SpaceMouse integration properties
+    Q_PROPERTY(QString interactionMode READ interactionMode WRITE setInteractionMode NOTIFY
+                   interactionModeChanged)
+    Q_PROPERTY(bool spaceMouseEnabled READ spaceMouseEnabled WRITE setSpaceMouseEnabled NOTIFY
+                   spaceMouseEnabledChanged)
+    Q_PROPERTY(bool spaceMouseConnected READ spaceMouseConnected NOTIFY spaceMouseConnectionChanged)
+    Q_PROPERTY(float spaceMouseTranslationSensitivity READ spaceMouseTranslationSensitivity WRITE
+                   setSpaceMouseTranslationSensitivity NOTIFY spaceMouseSensitivityChanged)
+    Q_PROPERTY(float spaceMouseRotationSensitivity READ spaceMouseRotationSensitivity WRITE
+                   setSpaceMouseRotationSensitivity NOTIFY spaceMouseSensitivityChanged)
+    Q_PROPERTY(QVector3D spaceMouseTranslationInput READ spaceMouseTranslationInput NOTIFY
+                   spaceMouseInputChanged)
+    Q_PROPERTY(QVector3D spaceMouseRotationInput READ spaceMouseRotationInput NOTIFY
+                   spaceMouseInputChanged)
 
    public:
     enum Shape { CUBE = 1, SPHERE = 2, TORUS = 3, TETRAHEDRON = 4 };
@@ -163,7 +181,7 @@ class OpenGL3DViewport : public QQuickFramebufferObject {
         return m_scaleSensitivity;
     }
 
-    // NEW: Research-specific getters
+    // Research-specific getters
     bool showReferenceModel() const {
         return m_showReferenceModel;
     }
@@ -178,6 +196,27 @@ class OpenGL3DViewport : public QQuickFramebufferObject {
     }
     bool taskActive() const {
         return m_taskActive;
+    }
+
+    // SpaceMouse getters
+    QString interactionMode() const {
+        return m_interactionMode;
+    }
+    bool spaceMouseEnabled() const {
+        return m_spaceMouseEnabled;
+    }
+    bool spaceMouseConnected() const;
+    float spaceMouseTranslationSensitivity() const {
+        return m_spaceMouseTranslationSensitivity;
+    }
+    float spaceMouseRotationSensitivity() const {
+        return m_spaceMouseRotationSensitivity;
+    }
+    QVector3D spaceMouseTranslationInput() const {
+        return m_spaceMouseTranslationInput;
+    }
+    QVector3D spaceMouseRotationInput() const {
+        return m_spaceMouseRotationInput;
     }
 
    public slots:
@@ -198,16 +237,22 @@ class OpenGL3DViewport : public QQuickFramebufferObject {
     void setTranslationSensitivity(float sensitivity);
     void setScaleSensitivity(float sensitivity);
 
-    // NEW: Research-specific setters
+    // Research-specific setters
     void setShowReferenceModel(bool show);
     void setShowMovableModel(bool show);
     void setShowVertexLabels(bool show);
     void calculateAlignmentAccuracy();
 
-    // NEW: Research task methods
+    // Research task methods
     Q_INVOKABLE void startAlignmentTask();
     Q_INVOKABLE void finishAlignmentTask();
     Q_INVOKABLE void nextInteractionMode();
+
+    // SpaceMouse integration methods
+    Q_INVOKABLE void setInteractionMode(const QString& mode);
+    void setSpaceMouseEnabled(bool enabled);
+    void setSpaceMouseTranslationSensitivity(float sensitivity);
+    void setSpaceMouseRotationSensitivity(float sensitivity);
 
    signals:
     void currentShapeChanged();
@@ -215,11 +260,18 @@ class OpenGL3DViewport : public QQuickFramebufferObject {
     void mousePressedChanged();
     void sensitivityChanged();
 
-    // NEW: Research-specific signals
+    // Research-specific signals
     void displayChanged();
     void alignmentChanged();
     void taskStateChanged();
     void alignmentCompleted(float accuracy, int timeMs);
+
+    // SpaceMouse signals
+    void interactionModeChanged();
+    void spaceMouseEnabledChanged();
+    void spaceMouseConnectionChanged();
+    void spaceMouseSensitivityChanged();
+    void spaceMouseInputChanged();
 
    protected:
     // Override QQuickItem event handlers
@@ -233,11 +285,24 @@ class OpenGL3DViewport : public QQuickFramebufferObject {
    private slots:
     void updateAnimation();
 
+    // SpaceMouse input handlers
+    void handleSpaceMouseTranslation(const QVector3D& translation);
+    void handleSpaceMouseRotation(const QVector3D& rotation);
+    void handleSpaceMouseLeftButton();
+    void handleSpaceMouseRightButton();
+    void onSpaceMouseConnectionChanged(bool connected);
+
    private:
     // Helper methods for mouse interactions
     void applyRotationDelta(const QPoint& delta);
     void applyTranslationDelta(const QPoint& delta);
     void applyScaleDelta(const QPoint& delta);
+
+    // SpaceMouse initialization
+    void initializeSpaceMouse();
+
+    // Research helper methods
+    QVector<QVector3D> getBaseVertices() const;
 
     // Shape and transform properties
     int m_currentShape;
@@ -254,13 +319,22 @@ class OpenGL3DViewport : public QQuickFramebufferObject {
     float m_translationSensitivity;
     float m_scaleSensitivity;
 
-    // NEW: Research data
+    // Research data
     bool m_showReferenceModel;
     bool m_showMovableModel;
     bool m_showVertexLabels;
     float m_alignmentAccuracy;
     QElapsedTimer m_taskStartTime;
     bool m_taskActive;
+
+    // SpaceMouse integration
+    QString m_interactionMode;
+    bool m_spaceMouseEnabled;
+    SpaceMouseManager* m_spaceMouseManager;
+    float m_spaceMouseTranslationSensitivity;
+    float m_spaceMouseRotationSensitivity;
+    QVector3D m_spaceMouseTranslationInput;
+    QVector3D m_spaceMouseRotationInput;
 };
 
 #endif  // OPENGL3DVIEWPORT_HPP
